@@ -166,7 +166,7 @@ EdgeLink 支持可选的注册用户体系，生成短链的权限由管理员�
 > 🔒 **安全说明**：管理后台 Token 存储在浏览器 `sessionStorage` 中，30 分钟后自动过期，关闭标签页后也会清除，不会持久化在本地。
 
 ### 3. 配置邮件服务（注册验证码必需）
-用户注册需要邮箱验证码验证。边缘函数环境通过邮件服务商的 HTTP API 发信（与 SMTP 等价），在环境变量中配置其中**一组**即可：
+用户注册需要邮箱验证码验证。边缘函数环境通过邮件服务商的 HTTP API 发信（与 SMTP 等价），在环境变量中配置其中**一组**即可。**各服务商的注册申请、域名验证、获取密钥的详细步骤，见下方《📧 邮件服务商申请与配置详细指南》。**
 
 | 服务商 | 免费额度 | 需配置的环境变量 | 说明 |
 | --- | --- | --- | --- |
@@ -176,6 +176,84 @@ EdgeLink 支持可选的注册用户体系，生成短链的权限由管理员�
 | 阿里云邮件推送 DirectMail | 共 2000 封（每天最多 200 封），超出 ¥2/1000 封 | `ALIYUN_DM_ACCESS_KEY_ID` + `ALIYUN_DM_ACCESS_KEY_SECRET`，必需 `MAIL_FROM`；可选 `ALIYUN_DM_REGION`（默认 `cn-hangzhou`）、`ALIYUN_DM_FROM_ALIAS`（发件人显示名） | 需在 DirectMail 控制台验证发信域名与发信地址；AccessKey 需具备 DirectMail 权限 |
 
 配置后重新部署即可生效。**未配置邮件服务时，注册功能将无法发送验证码**（本地开发模式下验证码会直接在接口响应中返回，方便调试）。
+
+---
+
+## 📧 邮件服务商申请与配置详细指南
+
+> 四选一即可。国内用户推荐 **阿里云 DirectMail**；追求免费额度大推荐 **Brevo**；只想最快跑通推荐 **Resend**。
+
+### 方案一：阿里云邮件推送 DirectMail（国内推荐）
+
+**申请入口**：https://www.aliyun.com/product/directmail （控制台：https://dm.console.aliyun.com/）
+
+**步骤：**
+
+1. **开通服务**：登录阿里云 → 访问 DirectMail 产品页 → 点击"立即开通"（按量付费默认，有 2000 封免费额度，每天最多 200 封）。
+2. **验证发信域名**：
+   - 进入 DirectMail 控制台 → **发信域名** → 新建域名，填入 `go.info35.org`（替换为您自己的域名）。
+   - 按控制台提示到您的 DNS 解析处（如 EdgeOne/腾讯云 DNSPod/阿里云解析）添加记录：**1 条 TXT（SPF）+ 1 条 CNAME（DKIM）+ 1 条 MX 记录**，具体值以控制台显示为准。
+   - 添加后回到控制台点击"验证"，等待 DNS 生效（通常几分钟到几小时）。
+3. **创建发信地址**：控制台 → **发信地址** → 新建，例如 `noreply@go.info35.org`，类型选"触发邮件"，设置 SMTP 密码（本项目用不到，可随意），并完成回信地址验证。
+4. **创建 AccessKey（建议 RAM 子账号）**：
+   - 访问 RAM 控制台：https://ram.console.aliyun.com → 创建子用户 → 勾选"OpenAPI 调用访问"→ 生成 AccessKey ID 和 Secret（**Secret 只显示一次，立即保存**）。
+   - 为该子用户授权策略 `AliyunDirectMailFullAccess`（或自定义仅 DirectMail 发信权限）。
+5. **在 EdgeOne Pages 配置环境变量**（项目设置 → 环境变量）：
+   - `ALIYUN_DM_ACCESS_KEY_ID` = AccessKey ID
+   - `ALIYUN_DM_ACCESS_KEY_SECRET` = AccessKey Secret
+   - `MAIL_FROM` = `noreply@go.info35.org`（第 3 步创建的发信地址）
+   - `ALIYUN_DM_FROM_ALIAS` = 发件人显示名（可选，如 `EdgeLink`）
+   - `ALIYUN_DM_REGION` = DirectMail 所在区域（可选，默认 `cn-hangzhou`）
+6. **重新部署**项目，然后用一个邮箱注册测试。
+
+### 方案二：Resend（最快跑通，免费 3000 封/月）
+
+**申请入口**：https://resend.com （支持 GitHub/Google 直接登录）
+
+**步骤：**
+
+1. 注册并登录后，进入 **API Keys**（https://resend.com/api-keys）→ Create API Key → 复制保存（只显示一次）。
+2. **验证域名（可选但推荐）**：进入 **Domains**（https://resend.com/domains）→ Add Domain → 填 `go.info35.org` → 按提示到 DNS 处添加 TXT/CNAME/MX 记录并验证。
+   - 未验证域名时，`MAIL_FROM` 不配置即可使用官方测试发件人 `onboarding@resend.dev`，但**只能发给您注册 Resend 的邮箱**，正式使用请务必验证域名。
+3. 在 EdgeOne Pages 配置环境变量：
+   - `RESEND_API_KEY` = 第 1 步的 API Key
+   - `MAIL_FROM` = `EdgeLink <noreply@go.info35.org>`（域名验证后）
+4. 重新部署。
+
+### 方案三：Brevo / Sendinblue（免费额度最大：300 封/天）
+
+**申请入口**：https://www.brevo.com （原 Sendinblue）
+
+**步骤：**
+
+1. 注册账号（免费套餐无需绑卡，300 封/天）。
+2. **验证发件人**：登录后进入 **Senders**（https://app.brevo.com/senders）→ 添加发件人（如 `noreply@go.info35.org`）→ 到邮箱点击验证链接。若域名属于您，建议按提示加 SPF/DKIM 记录提高送达率。
+3. **获取 API Key**：进入 **SMTP & API**（https://app.brevo.com/settings/keys/api）→ Generate New API Key → 复制保存。
+4. 在 EdgeOne Pages 配置环境变量：
+   - `BREVO_API_KEY` = 第 3 步的 API Key
+   - `MAIL_FROM` = 第 2 步验证过的发件人地址
+5. 重新部署。
+
+### 方案四：SMTP2GO（免费 1000 封/月）
+
+**申请入口**：https://www.smtp2go.com
+
+**步骤：**
+
+1. 注册账号 → 按引导 **验证发件人邮箱或发信域名**（域名验证：添加控制台给出的 SPF/DKIM/CNAME 记录）。
+2. 进入 **Settings → API Keys**（https://app.smtp2go.com/settings/api_keys/）→ Create API Key → 复制保存。
+3. 在 EdgeOne Pages 配置环境变量：
+   - `SMTP2GO_API_KEY` = 第 2 步的 API Key
+   - `MAIL_FROM` = 已验证的发件人地址
+4. 重新部署。
+
+### ❓ 常见问题
+
+- **注册时提示"邮件服务未配置"**：说明 EdgeOne 环境变量没配或没重新部署。检查变量名拼写是否与上表完全一致。
+- **收不到验证码**：先查垃圾箱；再确认 `MAIL_FROM` 的域名 DNS 记录（SPF/DKIM）已验证通过——未验证域名发出的邮件极易进垃圾箱或被拒收。
+- **发送失败（502）**：查看 EdgeOne Pages 的函数日志，若阿里云返回 `InvalidAccessKeyId` 则 AccessKey 错误；返回 `SignatureDoesNotMatch` 则 Secret 错误。
+- **验证码发送频率限制**：同一邮箱 60 秒 1 封、每 IP 每小时 10 封，这是防滥用设计。
+- **测试提示"本地开发模式"**：仅在 `localhost` 下未配置邮件服务时出现，线上不会。
 
 ---
 
