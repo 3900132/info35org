@@ -22,7 +22,8 @@ export default async function onRequest(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      requireRegister: settings.requireRegister
+      requireRegister: settings.requireRegister,
+      disableRegister: settings.disableRegister
     }), { status: 200, headers: corsHeaders() });
 
   } catch (err) {

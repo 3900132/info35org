@@ -33,7 +33,8 @@ export default async function onRequest(context) {
       return new Response(JSON.stringify({
         success: true,
         requireRegister: settings.requireRegister,
-        requireApproval: settings.requireApproval
+        requireApproval: settings.requireApproval,
+        disableRegister: settings.disableRegister
       }), { status: 200, headers: corsHeaders() });
     }
 
@@ -63,8 +64,16 @@ export default async function onRequest(context) {
       }
       patch.requireApproval = body.requireApproval;
     }
+    if (body.disableRegister !== undefined) {
+      if (typeof body.disableRegister !== 'boolean') {
+        return new Response(JSON.stringify({ error: 'disableRegister 必须为布尔值。' }), {
+          status: 400, headers: corsHeaders()
+        });
+      }
+      patch.disableRegister = body.disableRegister;
+    }
     if (Object.keys(patch).length === 0) {
-      return new Response(JSON.stringify({ error: '未提供任何设置项（requireRegister / requireApproval）。' }), {
+      return new Response(JSON.stringify({ error: '未提供任何设置项（requireRegister / requireApproval / disableRegister）。' }), {
         status: 400, headers: corsHeaders()
       });
     }
@@ -73,9 +82,14 @@ export default async function onRequest(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `设置已保存：${patch.requireRegister !== undefined ? (patch.requireRegister ? '仅注册用户可生成短链' : '所有访客可生成短链') : ''}${patch.requireRegister !== undefined && patch.requireApproval !== undefined ? '；' : ''}${patch.requireApproval !== undefined ? (patch.requireApproval ? '新用户注册需审核' : '新用户注册免审核') : ''}`,
+      message: `设置已保存：${[
+        patch.requireRegister !== undefined ? (patch.requireRegister ? '仅注册用户可生成短链' : '所有访客可生成短链') : null,
+        patch.requireApproval !== undefined ? (patch.requireApproval ? '新用户注册需审核' : '新用户注册免审核') : null,
+        patch.disableRegister !== undefined ? (patch.disableRegister ? '禁止新用户注册' : '允许新用户注册') : null
+      ].filter(Boolean).join('；') || '无变更'}`,
       requireRegister: patch.requireRegister,
-      requireApproval: patch.requireApproval
+      requireApproval: patch.requireApproval,
+      disableRegister: patch.disableRegister
     }), { status: 200, headers: corsHeaders() });
 
   } catch (err) {

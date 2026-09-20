@@ -354,6 +354,7 @@ async function deleteLink(code) {
 async function loadSiteSettings() {
   const toggle = document.getElementById('requireRegisterToggle');
   const approvalToggle = document.getElementById('requireApprovalToggle');
+  const disableToggle = document.getElementById('disableRegisterToggle');
   if (!toggle || !activeAdminToken) return;
   try {
     const resp = await fetch('/api/admin/settings', {
@@ -363,6 +364,7 @@ async function loadSiteSettings() {
     if (resp.ok) {
       toggle.checked = !!data.requireRegister;
       if (approvalToggle) approvalToggle.checked = !!data.requireApproval;
+      if (disableToggle) disableToggle.checked = !!data.disableRegister;
     }
   } catch (e) { /* ignore */ }
 }
@@ -393,6 +395,10 @@ async function handleRequireRegisterToggle(checkbox) {
 async function handleRequireApprovalToggle(checkbox) {
   await saveAdminSetting('requireApproval', !!checkbox.checked, checkbox);
   loadAdminUsers();
+}
+
+async function handleDisableRegisterToggle(checkbox) {
+  await saveAdminSetting('disableRegister', !!checkbox.checked, checkbox);
 }
 
 /* ----------------------------------------------------

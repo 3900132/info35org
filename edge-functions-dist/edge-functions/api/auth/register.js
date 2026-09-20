@@ -229,7 +229,8 @@ async function getSiteSettings(kv) {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return {
       requireRegister: !!(parsed && parsed.requireRegister),
-      requireApproval: !!(parsed && parsed.requireApproval)
+      requireApproval: !!(parsed && parsed.requireApproval),
+      disableRegister: !!(parsed && parsed.disableRegister)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
@@ -393,8 +394,14 @@ export default async function onRequest(context) {
     const salt = randomHex(16);
     const passwordHash = await hashPassword(password, salt);
 
-    // 是否需要管理员审核（防恶意注册）
+    // 是否禁止新用户注册（防恶意注册总闸）
     const settings = await getSiteSettings(kv);
+    if (settings.disableRegister) {
+      return new Response(JSON.stringify({ error: '本站已暂停新用户注册，请稍后再试或联系管理员。' }), {
+        status: 403, headers: corsHeaders()
+      });
+    }
+
     const status = settings.requireApproval ? 'pending' : 'active';
 
     const createdAt = new Date().toISOString();

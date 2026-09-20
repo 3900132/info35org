@@ -131,8 +131,8 @@
               <p id="authHint">登录后您的短链将归属到您的账户，可在管理后台查看统计。</p>
             </div>
             <div class="auth-tabs" style="display:flex;gap:10px;margin-bottom:16px;">
-              <button type="button" id="tabLogin" onclick="switchAuthTab('login')" class="btn btn-secondary" style="flex:1;">登录</button>
-              <button type="button" id="tabRegister" onclick="switchAuthTab('register')" class="btn btn-secondary" style="flex:1;">注册</button>
+              <button type="button" id="tabLogin" onclick="switchAuthTab('login', true)" class="btn btn-secondary" style="flex:1;">登录</button>
+              <button type="button" id="tabRegister" onclick="switchAuthTab('register', true)" class="btn btn-secondary" style="flex:1;">注册</button>
             </div>
             <form id="authForm" onsubmit="handleAuthSubmit(event)">
               <div class="form-group">

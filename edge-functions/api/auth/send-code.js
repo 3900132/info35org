@@ -207,13 +207,7 @@ export default async function onRequest(context) {
 
     const subject = 'EdgeLink 注册验证码';
     const text = `您的 EdgeLink 注册验证码是：${code}。10 分钟内有效，请勿泄露给他人。如非本人操作请忽略本邮件。`;
-    const html = `
-      <div style="max-width:480px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,'Microsoft YaHei',sans-serif;padding:32px;background:#0d111a;border-radius:16px;color:#f0f3f8;">
-        <h2 style="margin:0 0 8px;font-size:20px;">⚡ EdgeLink 注册验证码</h2>
-        <p style="color:#9aa3b2;font-size:14px;margin:0 0 24px;">您正在注册 EdgeLink 账号，请使用以下验证码完成注册：</p>
-        <div style="font-size:34px;font-weight:800;letter-spacing:8px;font-family:monospace;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;color:#4cc9f0;">${code}</div>
-        <p style="color:#9aa3b2;font-size:12px;margin:24px 0 0;">验证码 10 分钟内有效。如非本人操作，请忽略本邮件。</p>
-      </div>`;
+    const html = `<div style="max-width:480px;margin:0 auto;font-family:'Microsoft YaHei',sans-serif;padding:28px;background:#0d111a;border-radius:14px;color:#f0f3f8;"><h2 style="margin:0 0 8px;font-size:20px;">⚡ EdgeLink 注册验证码</h2><p style="color:#9aa3b2;font-size:14px;margin:0 0 20px;">您正在注册 EdgeLink 账号，请使用以下验证码完成注册：</p><div style="font-size:32px;font-weight:800;letter-spacing:8px;font-family:monospace;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:16px;text-align:center;color:#4cc9f0;">${code}</div><p style="color:#9aa3b2;font-size:12px;margin:20px 0 0;">验证码 10 分钟内有效，请勿泄露。如非本人操作，请忽略本邮件。</p></div>`;
 
     let resp;
     if (provider.name === 'aliyun') {

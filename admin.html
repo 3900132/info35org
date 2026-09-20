@@ -119,6 +119,10 @@
                 <input type="checkbox" id="requireApprovalToggle" onchange="handleRequireApprovalToggle(this)" style="width:20px;height:20px;cursor:pointer;">
                 <span style="font-size:0.9rem;">新用户注册需管理员审核</span>
               </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" id="disableRegisterToggle" onchange="handleDisableRegisterToggle(this)" style="width:20px;height:20px;cursor:pointer;">
+                <span style="font-size:0.9rem;color:var(--danger-color);">禁止新用户注册（总闸）</span>
+              </label>
             </div>
           </div>
         </div>

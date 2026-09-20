@@ -229,7 +229,8 @@ async function getSiteSettings(kv) {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return {
       requireRegister: !!(parsed && parsed.requireRegister),
-      requireApproval: !!(parsed && parsed.requireApproval)
+      requireApproval: !!(parsed && parsed.requireApproval),
+      disableRegister: !!(parsed && parsed.disableRegister)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
@@ -302,7 +303,8 @@ export default async function onRequest(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      requireRegister: settings.requireRegister
+      requireRegister: settings.requireRegister,
+      disableRegister: settings.disableRegister
     }), { status: 200, headers: corsHeaders() });
 
   } catch (err) {

@@ -10,7 +10,7 @@ let localHistory = [];
 // Auth state
 let authToken = localStorage.getItem('edgelink_token') || '';
 let authUsername = localStorage.getItem('edgelink_username') || '';
-let siteSettings = { requireRegister: false };
+let siteSettings = { requireRegister: false, disableRegister: false };
 let authMode = 'login';
 
 // Build headers for API calls (attaches token when logged in)
@@ -27,9 +27,14 @@ async function initAuth() {
     if (resp.ok) {
       const data = await resp.json();
       siteSettings.requireRegister = !!data.requireRegister;
+      siteSettings.disableRegister = !!data.disableRegister;
     }
   } catch (e) { /* default off */ }
   updateAuthHint();
+
+  // 禁止注册时隐藏注册页签
+  const tabRegister = document.getElementById('tabRegister');
+  if (tabRegister) tabRegister.classList.toggle('hidden', siteSettings.disableRegister);
 
   if (authToken) {
     try {
@@ -46,11 +51,17 @@ async function initAuth() {
   }
   setLoggedInView(false);
 
-  // 初始化页签状态；开启注册限制时自动切到注册页签（含验证码输入框）
-  switchAuthTab(siteSettings.requireRegister ? 'register' : 'login');
+  // 初始化页签状态；仅在用户尚未手动选择时自动切换
+  // （开启注册限制时自动切到注册页签，含验证码输入框）
+  if (!authTabUserSelected) {
+    switchAuthTab(siteSettings.requireRegister || siteSettings.disableRegister ? 'register' : 'login');
+  }
 
   if (siteSettings.requireRegister) {
     showToast('本站已开启"注册用户才能生成短链"，请先注册或登录。', 'warning', 6000);
+  }
+  if (siteSettings.disableRegister) {
+    showToast('本站已暂停新用户注册，已有账户可正常登录。', 'warning', 6000);
   }
 }
 
@@ -81,7 +92,11 @@ function setLoggedInView(loggedIn) {
   }
 }
 
-function switchAuthTab(mode) {
+// State: whether the user manually clicked a tab (prevents auto-switch override)
+let authTabUserSelected = false;
+
+function switchAuthTab(mode, userInitiated = false) {
+  if (userInitiated) authTabUserSelected = true;
   authMode = mode;
   document.getElementById('tabLogin').style.fontWeight = mode === 'login' ? '800' : '400';
   document.getElementById('tabRegister').style.fontWeight = mode === 'register' ? '800' : '400';
