@@ -37,6 +37,14 @@ export default async function onRequest(context) {
       });
     }
 
+    // 是否禁止新用户注册（防恶意注册总闸）：优先校验，提示最明确
+    const settings = await getSiteSettings(kv);
+    if (settings.disableRegister) {
+      return new Response(JSON.stringify({ error: '本站已暂停新用户注册，请稍后再试或联系管理员。' }), {
+        status: 403, headers: corsHeaders()
+      });
+    }
+
     const email = (body.email || '').trim().toLowerCase();
     const password = body.password || '';
     const code = (body.code || '').trim();
@@ -112,14 +120,6 @@ export default async function onRequest(context) {
 
     const salt = randomHex(16);
     const passwordHash = await hashPassword(password, salt);
-
-    // 是否禁止新用户注册（防恶意注册总闸）
-    const settings = await getSiteSettings(kv);
-    if (settings.disableRegister) {
-      return new Response(JSON.stringify({ error: '本站已暂停新用户注册，请稍后再试或联系管理员。' }), {
-        status: 403, headers: corsHeaders()
-      });
-    }
 
     const status = settings.requireApproval ? 'pending' : 'active';
 
