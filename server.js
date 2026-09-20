@@ -36,8 +36,10 @@ globalThis.__mockKV.set('link:note', JSON.stringify({
 }));
 
 // Local environment variables simulating EdgeOne console bindings
+// (pass through all process.env so email provider keys work locally too)
 const LOCAL_ENV = {
   ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'admin123',
+  ...process.env
 };
 
 // Helper: Converts Express req/res to Web API Request/Response
@@ -202,6 +204,7 @@ const edgeRoutes = [
   { method: 'get',    path: '/api/admin/settings',        file: './edge-functions/api/admin/settings.js' },
   { method: 'post',   path: '/api/admin/settings',        file: './edge-functions/api/admin/settings.js' },
   { method: 'post',   path: '/api/auth/register',         file: './edge-functions/api/auth/register.js' },
+  { method: 'post',   path: '/api/auth/send-code',        file: './edge-functions/api/auth/send-code.js' },
   { method: 'post',   path: '/api/auth/login',            file: './edge-functions/api/auth/login.js' },
   { method: 'post',   path: '/api/auth/logout',           file: './edge-functions/api/auth/logout.js' },
   { method: 'get',    path: '/api/auth/me',               file: './edge-functions/api/auth/me.js' },

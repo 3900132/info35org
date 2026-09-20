@@ -1,4 +1,4 @@
-import { getKV, corsHeaders, verifyAdminAuth } from '../../lib/kv-helpers.js';
+import { getKV, corsHeaders, verifyAdminAuth, normalizeListCursor } from '../../lib/kv-helpers.js';
 
 // Admin deletion of registered users. Accepts DELETE or POST with
 // { username } or { usernames: [...] }. Their links are kept and remain
@@ -85,7 +85,7 @@ export default async function onRequest(context) {
           for (const keyName of toDelete) {
             await kv.delete(keyName);
           }
-          cursor = res.list_complete ? null : (res.cursor || null);
+          cursor = res.list_complete ? null : normalizeListCursor(res.cursor);
         } while (cursor);
 
         deleted.push(username);

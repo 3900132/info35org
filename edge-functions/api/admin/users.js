@@ -1,4 +1,4 @@
-import { getKV, corsHeaders, verifyAdminAuth, listAllLinkKeys } from '../../lib/kv-helpers.js';
+import { getKV, corsHeaders, verifyAdminAuth, listAllLinkKeys, normalizeListCursor } from '../../lib/kv-helpers.js';
 
 // Lists all registered users together with per-user link count and click stats.
 export default async function onRequest(context) {
@@ -47,7 +47,7 @@ export default async function onRequest(context) {
           }
         } catch (e) { /* skip corrupted entries */ }
       }
-      cursor = res.list_complete ? null : (res.cursor || null);
+      cursor = res.list_complete ? null : normalizeListCursor(res.cursor);
     } while (cursor);
 
     // Aggregate per-user link counts and click stats

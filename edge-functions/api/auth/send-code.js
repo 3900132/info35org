@@ -1,0 +1,245 @@
+import { getKV, corsHeaders, checkRateLimit } from '../../lib/kv-helpers.js';
+
+// 发送邮箱验证码（注册用）。
+// 支持多家邮件服务商（均为官方 HTTP API，边缘函数可直连），
+// 在 EdgeOne Pages「项目设置 -> 环境变量」中按需配置其一即可：
+//   1. RESEND_API_KEY           (Resend,  https://resend.com)   可选 MAIL_FROM，默认 onboarding@resend.dev
+//   2. BREVO_API_KEY            (Brevo/Sendinblue, https://brevo.com) 必需 MAIL_FROM，需已验证发件人
+//   3. SMTP2GO_API_KEY          (SMTP2GO, https://smtp2go.com)   必需 MAIL_FROM，需已验证发件人
+//   4. ALIYUN_DM_ACCESS_KEY_ID  (阿里云邮件推送 DirectMail) + ALIYUN_DM_ACCESS_KEY_SECRET
+//      + MAIL_FROM（发信地址，需已在 DirectMail 控制台验证），可选 ALIYUN_DM_REGION（默认 cn-hangzhou）、
+//      ALIYUN_DM_FROM_ALIAS（发件人显示名）
+// 验证码有效期 10 分钟，60 秒内同邮箱只能发一次。
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const CODE_TTL_MS = 10 * 60 * 1000;
+
+// 阿里云 RPC 签名所需的百分号编码（RFC3986）
+function aliyunPercentEncode(str) {
+  return encodeURIComponent(String(str))
+    .replace(/\+/g, '%20')
+    .replace(/\*/g, '%2A')
+    .replace(/%7E/g, '~');
+}
+
+// 计算阿里云 DirectMail (RPC style) HMAC-SHA1 签名并返回完整请求 URL
+async function buildAliyunDirectMailUrl(provider, to, subject, text, html) {
+  const region = provider.region || 'cn-hangzhou';
+  const params = {
+    AccessKeyId: provider.keyId,
+    Action: 'SingleSendMail',
+    AccountName: provider.from,
+    AddressType: '1',
+    Format: 'JSON',
+    HtmlBody: html,
+    RegionId: region,
+    ReplyToAddress: 'false',
+    SignatureMethod: 'HMAC-SHA1',
+    SignatureNonce: crypto.randomUUID(),
+    SignatureVersion: '1.0',
+    Subject: subject,
+    TextBody: text,
+    Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    ToAddress: to,
+    Version: '2015-11-23'
+  };
+  if (provider.fromAlias) {
+    params.FromAlias = provider.fromAlias;
+  }
+
+  const sorted = Object.keys(params).sort();
+  const canonicalQuery = sorted
+    .map(k => `${aliyunPercentEncode(k)}=${aliyunPercentEncode(params[k])}`)
+    .join('&');
+
+  const stringToSign = `GET&${aliyunPercentEncode('/')}&${aliyunPercentEncode(canonicalQuery)}`;
+
+  const enc = new TextEncoder();
+  // 阿里云签名算法要求 HMAC-SHA1，密钥为 AccessKeySecret + '&'
+  const keySha1 = await crypto.subtle.importKey(
+    'raw', enc.encode(provider.keySecret + '&'), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', keySha1, enc.encode(stringToSign));
+  const signature = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
+
+  return `https://dm.${region}.aliyuncs.com/?${canonicalQuery}&Signature=${aliyunPercentEncode(signature)}`;
+}
+
+function buildMail(provider, from, to, code) {
+  const subject = 'EdgeLink 注册验证码';
+  const text = `您的 EdgeLink 注册验证码是：${code}。10 分钟内有效，请勿泄露给他人。如非本人操作请忽略本邮件。`;
+  const html = `
+    <div style="max-width:480px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,'Microsoft YaHei',sans-serif;padding:32px;background:#0d111a;border-radius:16px;color:#f0f3f8;">
+      <h2 style="margin:0 0 8px;font-size:20px;">⚡ EdgeLink 注册验证码</h2>
+      <p style="color:#9aa3b2;font-size:14px;margin:0 0 24px;">您正在注册 EdgeLink 账号，请使用以下验证码完成注册：</p>
+      <div style="font-size:34px;font-weight:800;letter-spacing:8px;font-family:monospace;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;color:#4cc9f0;">${code}</div>
+      <p style="color:#9aa3b2;font-size:12px;margin:24px 0 0;">验证码 10 分钟内有效。如非本人操作，请忽略本邮件。</p>
+    </div>`;
+
+  if (provider === 'resend') {
+    return {
+      url: 'https://api.resend.com/emails',
+      headers: { 'Authorization': `Bearer ${provider.key}`, 'Content-Type': 'application/json' },
+      body: { from, to: [to], subject, text, html }
+    };
+  }
+  if (provider === 'brevo') {
+    return {
+      url: 'https://api.brevo.com/v3/smtp/email',
+      headers: { 'api-key': provider.key, 'Content-Type': 'application/json', 'accept': 'application/json' },
+      body: { sender: { email: from }, to: [{ email: to }], subject, textContent: text, htmlContent: html }
+    };
+  }
+  // smtp2go
+  return {
+    url: 'https://api.smtp2go.com/v3/email/send',
+    headers: { 'Content-Type': 'application/json' },
+    body: { api_key: provider.key, to: [to], sender: from, subject, text_body: text, html_body: html }
+  };
+}
+
+function resolveProvider(context) {
+  const env = context.env || {};
+  const from = env.MAIL_FROM || '';
+  if (env.RESEND_API_KEY) return { name: 'resend', key: env.RESEND_API_KEY, from: from || 'EdgeLink <onboarding@resend.dev>' };
+  if (env.BREVO_API_KEY) return { name: 'brevo', key: env.BREVO_API_KEY, from: from || '' };
+  if (env.SMTP2GO_API_KEY) return { name: 'smtp2go', key: env.SMTP2GO_API_KEY, from: from || '' };
+  if (env.ALIYUN_DM_ACCESS_KEY_ID && env.ALIYUN_DM_ACCESS_KEY_SECRET) {
+    return {
+      name: 'aliyun',
+      keyId: env.ALIYUN_DM_ACCESS_KEY_ID,
+      keySecret: env.ALIYUN_DM_ACCESS_KEY_SECRET,
+      from: from || '',
+      region: env.ALIYUN_DM_REGION || 'cn-hangzhou',
+      fromAlias: env.ALIYUN_DM_FROM_ALIAS || 'EdgeLink'
+    };
+  }
+  return null;
+}
+
+export default async function onRequest(context) {
+  const { request } = context;
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders() });
+  }
+
+  if (request.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method Not Allowed. Use POST.' }), {
+      status: 405, headers: corsHeaders()
+    });
+  }
+
+  try {
+    const kv = getKV(context);
+
+    const clientIp = request.headers.get('x-forwarded-for') ||
+                     request.headers.get('cf-connecting-ip') ||
+                     request.headers.get('x-real-ip') || '127.0.0.1';
+
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body.' }), {
+        status: 400, headers: corsHeaders()
+      });
+    }
+
+    const email = (body.email || '').trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) {
+      return new Response(JSON.stringify({ error: '请输入有效的邮箱地址。' }), {
+        status: 400, headers: corsHeaders()
+      });
+    }
+
+    // 同邮箱 60 秒内只允许发送一次
+    const rateCheck = await checkRateLimit(kv, `sendcode:${email}`, 1, 60000);
+    if (!rateCheck.allowed) {
+      return new Response(JSON.stringify({
+        error: `发送过于频繁，请 ${Math.ceil((rateCheck.resetAt - Date.now()) / 1000)} 秒后再试。`
+      }), { status: 429, headers: corsHeaders() });
+    }
+
+    // 每 IP 每小时最多 10 次，防滥用
+    const ipCheck = await checkRateLimit(kv, `sendcode-ip:${clientIp}`, 10, 3600000);
+    if (!ipCheck.allowed) {
+      return new Response(JSON.stringify({ error: '验证码发送次数已达上限，请 1 小时后再试。' }), {
+        status: 429, headers: corsHeaders()
+      });
+    }
+
+    const urlStr = request.url || '';
+    const isLocal = urlStr.includes('localhost') || urlStr.includes('127.0.0.1');
+
+    const provider = resolveProvider(context);
+    if (!provider) {
+      if (isLocal) {
+        // 本地开发便利：未配置邮件服务时直接返回验证码（仅限 localhost）
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        const expiresAt = new Date(Date.now() + CODE_TTL_MS).toISOString();
+        await kv.put(`vcode:${email}`, JSON.stringify({ code, expiresAt, attempts: 0 }));
+        return new Response(JSON.stringify({
+          success: true,
+          devCode: code,
+          message: `[本地开发模式] 未配置邮件服务，验证码直接返回: ${code}`
+        }), { status: 200, headers: corsHeaders() });
+      }
+      return new Response(JSON.stringify({
+        error: '邮件服务未配置：请在 EdgeOne Pages 环境变量中设置 RESEND_API_KEY / BREVO_API_KEY / SMTP2GO_API_KEY 之一（以及可选的 MAIL_FROM），并重新部署。'
+      }), { status: 503, headers: corsHeaders() });
+    }
+
+    if (!provider.from) {
+      return new Response(JSON.stringify({
+        error: `邮件服务 ${provider.name} 需要在环境变量 MAIL_FROM 中配置已验证的发件人邮箱。`
+      }), { status: 503, headers: corsHeaders() });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = new Date(Date.now() + CODE_TTL_MS).toISOString();
+    await kv.put(`vcode:${email}`, JSON.stringify({ code, expiresAt, attempts: 0 }));
+
+    const subject = 'EdgeLink 注册验证码';
+    const text = `您的 EdgeLink 注册验证码是：${code}。10 分钟内有效，请勿泄露给他人。如非本人操作请忽略本邮件。`;
+    const html = `
+      <div style="max-width:480px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,'Microsoft YaHei',sans-serif;padding:32px;background:#0d111a;border-radius:16px;color:#f0f3f8;">
+        <h2 style="margin:0 0 8px;font-size:20px;">⚡ EdgeLink 注册验证码</h2>
+        <p style="color:#9aa3b2;font-size:14px;margin:0 0 24px;">您正在注册 EdgeLink 账号，请使用以下验证码完成注册：</p>
+        <div style="font-size:34px;font-weight:800;letter-spacing:8px;font-family:monospace;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;color:#4cc9f0;">${code}</div>
+        <p style="color:#9aa3b2;font-size:12px;margin:24px 0 0;">验证码 10 分钟内有效。如非本人操作，请忽略本邮件。</p>
+      </div>`;
+
+    let resp;
+    if (provider.name === 'aliyun') {
+      // 阿里云 DirectMail：RPC 签名后 GET 请求
+      const url = await buildAliyunDirectMailUrl(provider, email, subject, text, html);
+      resp = await fetch(url, { method: 'GET' });
+    } else {
+      const mail = buildMail(provider, provider.from, email, code);
+      resp = await fetch(mail.url, {
+        method: 'POST',
+        headers: mail.headers,
+        body: JSON.stringify(mail.body)
+      });
+    }
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      console.error('[send-code] provider error:', resp.status, errText);
+      return new Response(JSON.stringify({ error: `验证码邮件发送失败（${provider.name} 返回 ${resp.status}），请稍后重试或联系管理员。` }), {
+        status: 502, headers: corsHeaders()
+      });
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      message: `验证码已发送至 ${email}，10 分钟内有效，请查收（注意检查垃圾邮件）。`
+    }), { status: 200, headers: corsHeaders() });
+
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `Internal Server Error: ${err.message}` }), {
+      status: 500, headers: corsHeaders()
+    });
+  }
+}

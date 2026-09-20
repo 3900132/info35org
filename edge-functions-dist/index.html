@@ -142,6 +142,22 @@
                   <input type="text" id="authUsername" placeholder="3-20 位字母、数字、短横线或下划线" required autocomplete="username">
                 </div>
               </div>
+              <div class="form-group hidden" id="authEmailGroup">
+                <label for="authEmail">邮箱 <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <span class="input-icon">📧</span>
+                  <input type="email" id="authEmail" placeholder="用于接收注册验证码" autocomplete="email">
+                </div>
+              </div>
+              <div class="form-group hidden" id="authCodeGroup">
+                <label for="authCode">邮箱验证码 <span class="required">*</span></label>
+                <div class="input-wrapper" style="display:flex;gap:8px;">
+                  <span class="input-icon">🔢</span>
+                  <input type="text" id="authCode" placeholder="6 位验证码" maxlength="6" inputmode="numeric" style="flex:1;">
+                  <button type="button" id="btnSendCode" onclick="sendVerificationCode()" class="btn btn-secondary" style="white-space:nowrap;padding:10px 14px;">发送验证码</button>
+                </div>
+                <small class="helper-text">验证码发送到您的邮箱，10 分钟内有效。</small>
+              </div>
               <div class="form-group">
                 <label for="authPassword">密码 <span class="required">*</span></label>
                 <div class="input-wrapper">

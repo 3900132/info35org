@@ -84,6 +84,64 @@ function switchAuthTab(mode) {
   document.getElementById('tabRegister').style.fontWeight = mode === 'register' ? '800' : '400';
   document.getElementById('btnAuthSubmit').textContent = mode === 'login' ? '登录' : '注册并登录';
   document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  // 注册模式需要邮箱 + 验证码
+  const isRegister = mode === 'register';
+  document.getElementById('authEmailGroup').classList.toggle('hidden', !isRegister);
+  document.getElementById('authCodeGroup').classList.toggle('hidden', !isRegister);
+  document.getElementById('authEmail').required = isRegister;
+  document.getElementById('authCode').required = isRegister;
+  document.getElementById('authHint').textContent = isRegister
+    ? '注册需要邮箱验证码验证，注册成功后自动登录。'
+    : (siteSettings.requireRegister
+      ? '本站已开启"注册用户才能生成短链"，请先注册并登录后再生成。'
+      : '登录后您的短链将归属到您的账户，可在管理后台查看统计。（当前未登录也可直接生成）');
+}
+
+// 发送邮箱验证码（注册用），60 秒倒计时防重复
+let sendCodeCooldown = null;
+
+async function sendVerificationCode() {
+  const emailInput = document.getElementById('authEmail');
+  const btn = document.getElementById('btnSendCode');
+  const email = emailInput.value.trim();
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    showToast('请先输入有效的邮箱地址', 'warning');
+    emailInput.focus();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '发送中...';
+
+  try {
+    const resp = await fetch('/api/auth/send-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '验证码发送失败');
+
+    showToast(data.message || '验证码已发送', 'success');
+    // 60 秒倒计时
+    let seconds = 60;
+    btn.textContent = `${seconds}s 后重发`;
+    sendCodeCooldown = setInterval(() => {
+      seconds--;
+      if (seconds <= 0) {
+        clearInterval(sendCodeCooldown);
+        btn.disabled = false;
+        btn.textContent = '重新发送';
+      } else {
+        btn.textContent = `${seconds}s 后重发`;
+      }
+    }, 1000);
+  } catch (err) {
+    showToast(err.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '发送验证码';
+  }
 }
 
 async function handleAuthSubmit(e) {
@@ -95,11 +153,20 @@ async function handleAuthSubmit(e) {
   btn.textContent = authMode === 'login' ? '登录中...' : '注册中...';
 
   try {
-    const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+    const isRegister = authMode === 'register';
+    const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+    const payload = isRegister
+      ? {
+          username,
+          email: document.getElementById('authEmail').value.trim(),
+          password,
+          code: document.getElementById('authCode').value.trim()
+        }
+      : { username, password };
     const resp = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify(payload)
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || '操作失败');

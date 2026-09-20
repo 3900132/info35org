@@ -246,22 +246,39 @@ async function saveSiteSettings(kv, patch) {
  * LINK LISTING HELPERS
  * ---------------------------------------------------- */
 
+// EdgeOne KV may return the pagination cursor as an object; normalize to string
+function normalizeListCursor(c) {
+  if (!c) return null;
+  if (typeof c === 'string') return c;
+  if (typeof c === 'object') {
+    if (typeof c.cursor === 'string') return c.cursor;
+    if (typeof c.value === 'string') return c.value;
+    if (typeof c.next === 'string') return c.next;
+    // Last resort: first string property found at depth 1
+    for (const v of Object.values(c)) {
+      if (typeof v === 'string') return v;
+    }
+    return null;
+  }
+  return null;
+}
+
 async function listAllLinkKeys(kv) {
   const keys = [];
   let cursor = null;
   do {
-    const res = await kv.list({ prefix: 'link:', limit: 100, cursor });
+    const res = await kv.list(cursor ? { prefix: 'link:', limit: 100, cursor } : { prefix: 'link:', limit: 100 });
     const batch = res.keys || [];
     for (const k of batch) {
       const keyName = typeof k === 'string' ? k : (k?.name || k?.key);
       if (keyName) keys.push(keyName);
     }
-    cursor = res.list_complete ? null : (res.cursor || null);
+    cursor = res.list_complete ? null : normalizeListCursor(res.cursor);
   } while (cursor);
   return keys;
 }
 
-// export { getKV, corsHeaders, escapeHtml, verifyAdminAuth, checkRateLimit, randomHex, timingSafeEqual, hashPassword, createUserToken, getUserFromToken, getSiteSettings, saveSiteSettings, listAllLinkKeys };
+// export { getKV, corsHeaders, escapeHtml, verifyAdminAuth, checkRateLimit, randomHex, timingSafeEqual, hashPassword, createUserToken, getUserFromToken, getSiteSettings, saveSiteSettings, listAllLinkKeys, normalizeListCursor };
 // Admin deletion of registered users. Accepts DELETE or POST with
 // { username } or { usernames: [...] }. Their links are kept and remain
 // attributed to the (deleted) username; all sessions are invalidated.
@@ -347,7 +364,7 @@ export default async function onRequest(context) {
           for (const keyName of toDelete) {
             await kv.delete(keyName);
           }
-          cursor = res.list_complete ? null : (res.cursor || null);
+          cursor = res.list_complete ? null : normalizeListCursor(res.cursor);
         } while (cursor);
 
         deleted.push(username);
