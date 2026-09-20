@@ -1,6 +1,5 @@
 import { getKV, corsHeaders, checkRateLimit, hashPassword, randomHex, createUserToken } from '../../lib/kv-helpers.js';
 
-const USERNAME_RE = /^[a-zA-Z0-9_-]{3,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export default async function onRequest(context) {
@@ -38,16 +37,9 @@ export default async function onRequest(context) {
       });
     }
 
-    const username = (body.username || '').trim();
     const email = (body.email || '').trim().toLowerCase();
     const password = body.password || '';
     const code = (body.code || '').trim();
-
-    if (!USERNAME_RE.test(username)) {
-      return new Response(JSON.stringify({
-        error: '用户名需为 3-20 位字母、数字、短横线或下划线。'
-      }), { status: 400, headers: corsHeaders() });
-    }
 
     if (!EMAIL_RE.test(email)) {
       return new Response(JSON.stringify({ error: '请输入有效的邮箱地址。' }), {
@@ -61,39 +53,19 @@ export default async function onRequest(context) {
       }), { status: 400, headers: corsHeaders() });
     }
 
+    // 邮箱即账户：直接按键检查是否已注册（优先于验证码校验，提示更友好）
+    const existing = await kv.get(`user:${email}`);
+    if (existing) {
+      return new Response(JSON.stringify({
+        error: '该邮箱已被注册。'
+      }), { status: 409, headers: corsHeaders() });
+    }
+
     if (!code) {
       return new Response(JSON.stringify({ error: '请输入邮箱验证码。' }), {
         status: 400, headers: corsHeaders()
       });
     }
-
-    const existing = await kv.get(`user:${username}`);
-    if (existing) {
-      return new Response(JSON.stringify({
-        error: '该用户名已被注册。'
-      }), { status: 409, headers: corsHeaders() });
-    }
-
-    // 检查邮箱是否已被其他账号占用
-    let cursor = null;
-    do {
-      const res = await kv.list(cursor ? { prefix: 'user:', limit: 100, cursor } : { prefix: 'user:', limit: 100 });
-      for (const k of (res.keys || [])) {
-        const keyName = typeof k === 'string' ? k : (k?.name || k?.key);
-        if (!keyName) continue;
-        const value = await kv.get(keyName);
-        if (!value) continue;
-        try {
-          const user = typeof value === 'string' ? JSON.parse(value) : value;
-          if (user && (user.email || '').toLowerCase() === email) {
-            return new Response(JSON.stringify({ error: '该邮箱已被其他账号绑定。' }), {
-              status: 409, headers: corsHeaders()
-            });
-          }
-        } catch (e) { /* skip corrupted entries */ }
-      }
-      cursor = res.list_complete ? null : (typeof res.cursor === 'string' ? res.cursor : (res.cursor?.cursor || res.cursor?.value || null));
-    } while (cursor);
 
     // 校验邮箱验证码
     const vcodeRaw = await kv.get(`vcode:${email}`);
@@ -142,20 +114,20 @@ export default async function onRequest(context) {
     const passwordHash = await hashPassword(password, salt);
 
     const createdAt = new Date().toISOString();
-    await kv.put(`user:${username}`, JSON.stringify({
-      username,
+    await kv.put(`user:${email}`, JSON.stringify({
+      username: email, // 邮箱即账户名（兼容后台用户列表与短链归属逻辑）
       email,
       salt,
       passwordHash,
       createdAt
     }));
 
-    const { token, expiresAt } = await createUserToken(kv, username);
+    const { token, expiresAt } = await createUserToken(kv, email);
 
     return new Response(JSON.stringify({
       success: true,
       message: '注册成功，已自动登录。',
-      username,
+      username: email,
       email,
       token,
       expiresAt

@@ -136,17 +136,10 @@
             </div>
             <form id="authForm" onsubmit="handleAuthSubmit(event)">
               <div class="form-group">
-                <label for="authUsername">用户名 <span class="required">*</span></label>
-                <div class="input-wrapper">
-                  <span class="input-icon">👤</span>
-                  <input type="text" id="authUsername" placeholder="3-20 位字母、数字、短横线或下划线" required autocomplete="username">
-                </div>
-              </div>
-              <div class="form-group hidden" id="authEmailGroup">
                 <label for="authEmail">邮箱 <span class="required">*</span></label>
                 <div class="input-wrapper">
                   <span class="input-icon">📧</span>
-                  <input type="email" id="authEmail" placeholder="用于接收注册验证码" autocomplete="email">
+                  <input type="email" id="authEmail" placeholder="使用邮箱注册和登录" required autocomplete="email">
                 </div>
               </div>
               <div class="form-group hidden" id="authCodeGroup">

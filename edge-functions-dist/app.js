@@ -84,14 +84,12 @@ function switchAuthTab(mode) {
   document.getElementById('tabRegister').style.fontWeight = mode === 'register' ? '800' : '400';
   document.getElementById('btnAuthSubmit').textContent = mode === 'login' ? '登录' : '注册并登录';
   document.getElementById('authPassword').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
-  // 注册模式需要邮箱 + 验证码
+  // 注册模式需要邮箱验证码
   const isRegister = mode === 'register';
-  document.getElementById('authEmailGroup').classList.toggle('hidden', !isRegister);
   document.getElementById('authCodeGroup').classList.toggle('hidden', !isRegister);
-  document.getElementById('authEmail').required = isRegister;
   document.getElementById('authCode').required = isRegister;
   document.getElementById('authHint').textContent = isRegister
-    ? '注册需要邮箱验证码验证，注册成功后自动登录。'
+    ? '注册需要邮箱验证码验证，注册成功后自动登录。邮箱即您的账户名。'
     : (siteSettings.requireRegister
       ? '本站已开启"注册用户才能生成短链"，请先注册并登录后再生成。'
       : '登录后您的短链将归属到您的账户，可在管理后台查看统计。（当前未登录也可直接生成）');
@@ -146,7 +144,7 @@ async function sendVerificationCode() {
 
 async function handleAuthSubmit(e) {
   e.preventDefault();
-  const username = document.getElementById('authUsername').value.trim();
+  const email = document.getElementById('authEmail').value.trim().toLowerCase();
   const password = document.getElementById('authPassword').value;
   const btn = document.getElementById('btnAuthSubmit');
   btn.disabled = true;
@@ -157,12 +155,11 @@ async function handleAuthSubmit(e) {
     const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
     const payload = isRegister
       ? {
-          username,
-          email: document.getElementById('authEmail').value.trim(),
+          email,
           password,
           code: document.getElementById('authCode').value.trim()
         }
-      : { username, password };
+      : { email, password };
     const resp = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -172,7 +169,7 @@ async function handleAuthSubmit(e) {
     if (!resp.ok) throw new Error(data.error || '操作失败');
 
     authToken = data.token;
-    authUsername = data.username || username;
+    authUsername = data.email || data.username || email;
     localStorage.setItem('edgelink_token', authToken);
     localStorage.setItem('edgelink_username', authUsername);
     setLoggedInView(true);

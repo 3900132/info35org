@@ -315,18 +315,23 @@ export default async function onRequest(context) {
       });
     }
 
-    const username = (body.username || '').trim();
+    const email = (body.email || body.username || '').trim().toLowerCase();
     const password = body.password || '';
 
-    if (!username || !password) {
-      return new Response(JSON.stringify({ error: '请输入用户名和密码。' }), {
+    if (!email) {
+      return new Response(JSON.stringify({ error: '请输入邮箱和密码。' }), {
+        status: 400, headers: corsHeaders()
+      });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      return new Response(JSON.stringify({ error: '请输入有效的邮箱地址。' }), {
         status: 400, headers: corsHeaders()
       });
     }
 
-    const raw = await kv.get(`user:${username}`);
+    const raw = await kv.get(`user:${email}`);
     if (!raw) {
-      return new Response(JSON.stringify({ error: '用户名或密码错误。' }), {
+      return new Response(JSON.stringify({ error: '邮箱或密码错误。' }), {
         status: 401, headers: corsHeaders()
       });
     }
@@ -342,17 +347,19 @@ export default async function onRequest(context) {
 
     const passwordHash = await hashPassword(password, user.salt || '');
     if (!timingSafeEqual(passwordHash, user.passwordHash || '')) {
-      return new Response(JSON.stringify({ error: '用户名或密码错误。' }), {
+      return new Response(JSON.stringify({ error: '邮箱或密码错误。' }), {
         status: 401, headers: corsHeaders()
       });
     }
 
-    const { token, expiresAt } = await createUserToken(kv, username);
+    const identity = user.email || user.username || email;
+    const { token, expiresAt } = await createUserToken(kv, identity);
 
     return new Response(JSON.stringify({
       success: true,
       message: '登录成功。',
-      username,
+      username: identity,
+      email: identity,
       token,
       expiresAt
     }), { status: 200, headers: corsHeaders() });

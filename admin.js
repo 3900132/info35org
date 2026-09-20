@@ -412,7 +412,7 @@ async function loadAdminUsers() {
       const created = u.createdAt ? new Date(u.createdAt).toLocaleString('zh-CN') : '未知';
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td><a href="javascript:void(0)" onclick="showUserLinks('${escapeHtmlAttr(u.username)}')" class="link-code" title="点击查看该用户的短链明细">👤 ${escapeHtml(u.username)}</a></td>
+        <td><a href="javascript:void(0)" onclick="showUserLinks('${escapeHtmlAttr(u.username)}')" class="link-code" title="点击查看该用户的短链明细">📧 ${escapeHtml(u.username)}</a></td>
         <td><span class="date-text">${created}</span></td>
         <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${u.linkCount || 0} 条</span></td>
         <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${u.totalClicks || 0} 次</span></td>
