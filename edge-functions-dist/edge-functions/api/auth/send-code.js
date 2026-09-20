@@ -228,7 +228,8 @@ async function getSiteSettings(kv) {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return {
-      requireRegister: !!(parsed && parsed.requireRegister)
+      requireRegister: !!(parsed && parsed.requireRegister),
+      requireApproval: !!(parsed && parsed.requireApproval)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
@@ -301,8 +302,10 @@ function aliyunPercentEncode(str) {
     .replace(/%7E/g, '~');
 }
 
-// 计算阿里云 DirectMail (RPC style) HMAC-SHA1 签名并返回完整请求 URL
-async function buildAliyunDirectMailUrl(provider, to, subject, text, html) {
+// 计算阿里云 DirectMail (RPC style) HMAC-SHA1 签名。
+// 使用 POST 表单编码（Content-Type: application/x-www-form-urlencoded），
+// 避免邮件 HTML 模板导致 GET URL 超长被网关拒绝（504）。
+async function buildAliyunDirectMailRequest(provider, to, subject, text, html) {
   const region = provider.region || 'cn-hangzhou';
   const params = {
     AccessKeyId: provider.keyId,
@@ -331,7 +334,7 @@ async function buildAliyunDirectMailUrl(provider, to, subject, text, html) {
     .map(k => `${aliyunPercentEncode(k)}=${aliyunPercentEncode(params[k])}`)
     .join('&');
 
-  const stringToSign = `GET&${aliyunPercentEncode('/')}&${aliyunPercentEncode(canonicalQuery)}`;
+  const stringToSign = `POST&${aliyunPercentEncode('/')}&${aliyunPercentEncode(canonicalQuery)}`;
 
   const enc = new TextEncoder();
   // 阿里云签名算法要求 HMAC-SHA1，密钥为 AccessKeySecret + '&'
@@ -341,7 +344,10 @@ async function buildAliyunDirectMailUrl(provider, to, subject, text, html) {
   const sigBuf = await crypto.subtle.sign('HMAC', keySha1, enc.encode(stringToSign));
   const signature = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
 
-  return `https://dm.${region}.aliyuncs.com/?${canonicalQuery}&Signature=${aliyunPercentEncode(signature)}`;
+  return {
+    url: `https://dm.${region}.aliyuncs.com/`,
+    body: `${canonicalQuery}&Signature=${aliyunPercentEncode(signature)}`
+  };
 }
 
 function buildMail(provider, from, to, code) {
@@ -491,9 +497,13 @@ export default async function onRequest(context) {
 
     let resp;
     if (provider.name === 'aliyun') {
-      // 阿里云 DirectMail：RPC 签名后 GET 请求
-      const url = await buildAliyunDirectMailUrl(provider, email, subject, text, html);
-      resp = await fetch(url, { method: 'GET' });
+      // 阿里云 DirectMail：RPC 签名后 POST 表单编码请求（避免 GET URL 超长导致 504）
+      const req = await buildAliyunDirectMailRequest(provider, email, subject, text, html);
+      resp = await fetch(req.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: req.body
+      });
     } else {
       const mail = buildMail(provider, provider.from, email, code);
       resp = await fetch(mail.url, {
@@ -506,7 +516,14 @@ export default async function onRequest(context) {
     if (!resp.ok) {
       const errText = await resp.text().catch(() => '');
       console.error('[send-code] provider error:', resp.status, errText);
-      return new Response(JSON.stringify({ error: `验证码邮件发送失败（${provider.name} 返回 ${resp.status}），请稍后重试或联系管理员。` }), {
+      // 提取服务商错误码，帮助定位问题（如 InvalidAccessKeyId / SignatureDoesNotMatch / InvalidMailAddress）
+      let providerCode = '';
+      try {
+        const errJson = JSON.parse(errText);
+        providerCode = errJson.Code || errJson.code || errJson.error || '';
+      } catch (e) { /* not json */ }
+      const codeHint = providerCode ? `，错误码: ${providerCode}` : '';
+      return new Response(JSON.stringify({ error: `验证码邮件发送失败（${provider.name} 返回 ${resp.status}${codeHint}），请稍后重试或联系管理员。` }), {
         status: 502, headers: corsHeaders()
       });
     }

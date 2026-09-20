@@ -60,7 +60,15 @@
 
       <!-- Admin Control Panel (Hidden until authorized) -->
       <div id="adminConsole" class="admin-console hidden">
-        
+
+        <!-- Tab Nav -->
+        <div class="admin-tab-nav" style="display:flex;gap:10px;margin-bottom:18px;">
+          <button id="tabBtnLinks" onclick="switchAdminTab('links')" class="btn btn-primary" style="flex:1;">🔗 短链管理</button>
+          <button id="tabBtnUsers" onclick="switchAdminTab('users')" class="btn btn-secondary" style="flex:1;">👥 用户管理 <span id="userTabBadge" class="hidden" style="background:var(--danger-color);color:#fff;border-radius:10px;padding:1px 7px;font-size:0.75rem;margin-left:4px;"></span></button>
+        </div>
+
+        <div id="tabLinks">
+
         <!-- Summary Cards -->
         <div class="stats-grid">
           <div class="stats-card glass">
@@ -100,41 +108,18 @@
           <div class="card-header flex-header">
             <div>
               <h2>站点设置</h2>
-              <p>控制是否只有注册用户才能生成短链。</p>
+              <p>控制注册与短链生成权限。</p>
             </div>
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-              <input type="checkbox" id="requireRegisterToggle" onchange="handleRequireRegisterToggle(this)" style="width:20px;height:20px;cursor:pointer;">
-              <span id="requireRegisterLabel" style="font-size:0.9rem;">仅注册用户可生成短链</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- User Management -->
-        <div class="card glass">
-          <div class="card-header flex-header">
-            <div>
-              <h2>用户管理</h2>
-              <p>注册用户列表及其短链数量与累计点击。<span style="color:var(--accent-color);">点击用户名可查看该用户的全部短链明细。</span></p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" id="requireRegisterToggle" onchange="handleRequireRegisterToggle(this)" style="width:20px;height:20px;cursor:pointer;">
+                <span style="font-size:0.9rem;">仅注册用户可生成短链</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                <input type="checkbox" id="requireApprovalToggle" onchange="handleRequireApprovalToggle(this)" style="width:20px;height:20px;cursor:pointer;">
+                <span style="font-size:0.9rem;">新用户注册需管理员审核</span>
+              </label>
             </div>
-            <div class="header-actions">
-              <button onclick="loadAdminUsers()" class="btn btn-secondary">🔄 刷新用户</button>
-            </div>
-          </div>
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>邮箱（账户）</th>
-                  <th>注册时间</th>
-                  <th>短链数量</th>
-                  <th>累计点击</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="adminUsersList">
-                <tr class="empty-row"><td colspan="5">正在加载用户数据...</td></tr>
-              </tbody>
-            </table>
           </div>
         </div>
 
@@ -146,6 +131,7 @@
               <p>已保存在 EdgeOne KV 存储空间的所有短链列表。</p>
             </div>
             <div class="header-actions">
+              <span style="font-size:0.85rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;">每页显示 <input type="number" id="linksPageSize" value="30" min="10" max="500" onchange="applyLinksPageSize()" style="width:64px;background:rgba(255,255,255,0.06);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);padding:4px 8px;"> 条</span>
               <input type="text" id="adminSearchInput" oninput="filterAdminLinks()" placeholder="搜索短地址/内容..." class="search-input">
               <button onclick="exportCSV()" class="btn btn-secondary">
                 📥 导出CSV
@@ -190,8 +176,45 @@
             </button>
           </div>
         </div>
+
+        </div><!-- /tabLinks -->
+
+        <div id="tabUsers" class="hidden">
+          <!-- User Management -->
+          <div class="card glass">
+            <div class="card-header flex-header">
+              <div>
+                <h2>用户管理</h2>
+                <p>注册用户列表及其状态、短链数量与累计点击。<span style="color:var(--accent-color);">点击邮箱可查看该用户的全部短链明细。</span></p>
+              </div>
+              <div class="header-actions">
+                <span style="font-size:0.85rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;">每页显示 <input type="number" id="usersPageSize" value="30" min="10" max="500" onchange="applyUsersPageSize()" style="width:64px;background:rgba(255,255,255,0.06);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);padding:4px 8px;"> 条</span>
+                <button onclick="loadAdminUsers()" class="btn btn-secondary">🔄 刷新用户</button>
+              </div>
+            </div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>邮箱（账户）</th>
+                    <th>状态</th>
+                    <th>注册时间</th>
+                    <th>短链数量</th>
+                    <th>累计点击</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="adminUsersList">
+                  <tr class="empty-row"><td colspan="6">正在加载用户数据...</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p id="usersPageInfo" style="text-align:center;color:var(--text-muted);font-size:0.85rem;padding:10px 0 0;"></p>
+          </div>
+        </div><!-- /tabUsers -->
+
       </div>
-      
+
     </main>
 
     <!-- QR Code Modal (Hidden by default) -->

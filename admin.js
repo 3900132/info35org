@@ -271,10 +271,13 @@ function renderAdminLinks(filterQuery = '') {
   updateSelectedCount();
   if (filtered.length === 0) {
     listBody.innerHTML = `<tr class="empty-row"><td colspan="8">${filterQuery ? 'No matches' : 'No links in KV'}</td></tr>`;
+    document.getElementById('loadMoreContainer').classList.toggle('hidden', !adminCursor);
     return;
   }
+  // 分页显示：只渲染前 linksPageSize 条，可在卡片右上角调整每页数量
+  const shown = filtered.slice(0, linksPageSize);
   listBody.innerHTML = '';
-  filtered.forEach(item => {
+  shown.forEach(item => {
     const row = document.createElement('tr');
     const origin = window.location.origin;
     const shortUrl = `${origin}/${item.code}`;
@@ -350,24 +353,27 @@ async function deleteLink(code) {
 
 async function loadSiteSettings() {
   const toggle = document.getElementById('requireRegisterToggle');
+  const approvalToggle = document.getElementById('requireApprovalToggle');
   if (!toggle || !activeAdminToken) return;
   try {
     const resp = await fetch('/api/admin/settings', {
       headers: { 'Authorization': `Bearer ${activeAdminToken}` }
     });
     const data = await resp.json();
-    if (resp.ok) toggle.checked = !!data.requireRegister;
+    if (resp.ok) {
+      toggle.checked = !!data.requireRegister;
+      if (approvalToggle) approvalToggle.checked = !!data.requireApproval;
+    }
   } catch (e) { /* ignore */ }
 }
 
-async function handleRequireRegisterToggle(checkbox) {
-  const value = !!checkbox.checked;
+async function saveAdminSetting(key, value, checkbox) {
   checkbox.disabled = true;
   try {
     const resp = await fetch('/api/admin/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeAdminToken}` },
-      body: JSON.stringify({ requireRegister: value })
+      body: JSON.stringify({ [key]: value })
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || '保存失败');
@@ -380,6 +386,15 @@ async function handleRequireRegisterToggle(checkbox) {
   }
 }
 
+async function handleRequireRegisterToggle(checkbox) {
+  await saveAdminSetting('requireRegister', !!checkbox.checked, checkbox);
+}
+
+async function handleRequireApprovalToggle(checkbox) {
+  await saveAdminSetting('requireApproval', !!checkbox.checked, checkbox);
+  loadAdminUsers();
+}
+
 /* ----------------------------------------------------
  * USER MANAGEMENT
  * ---------------------------------------------------- */
@@ -388,11 +403,65 @@ function escapeHtmlAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+let allUsers = [];
+let usersPageSize = 30;
+let linksPageSize = 30;
+
+// 后台页签切换
+function switchAdminTab(tab) {
+  const isLinks = tab === 'links';
+  document.getElementById('tabLinks').classList.toggle('hidden', !isLinks);
+  document.getElementById('tabUsers').classList.toggle('hidden', isLinks);
+  document.getElementById('tabBtnLinks').className = isLinks ? 'btn btn-primary' : 'btn btn-secondary';
+  document.getElementById('tabBtnUsers').className = isLinks ? 'btn btn-secondary' : 'btn btn-primary';
+  if (!isLinks) loadAdminUsers();
+}
+
+function applyLinksPageSize() {
+  const v = parseInt(document.getElementById('linksPageSize').value, 10);
+  linksPageSize = (isNaN(v) || v < 10) ? 30 : Math.min(v, 500);
+  renderAdminLinks(adminFilterQuery);
+}
+
+function applyUsersPageSize() {
+  const v = parseInt(document.getElementById('usersPageSize').value, 10);
+  usersPageSize = (isNaN(v) || v < 10) ? 30 : Math.min(v, 500);
+  renderAdminUsers();
+}
+
+function userStatusBadge(status) {
+  if (status === 'pending') {
+    return '<span style="background:rgba(255,180,0,0.12);color:#ffb400;padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(255,180,0,0.3);">待审核</span>';
+  }
+  if (status === 'blocked') {
+    return '<span style="background:rgba(255,69,58,0.1);color:var(--danger-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(255,69,58,0.2);">已封禁</span>';
+  }
+  return '<span style="background:rgba(50,215,75,0.1);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(50,215,75,0.2);">正常</span>';
+}
+
+async function setUserStatus(username, status) {
+  const actionText = { active: '通过审核/解封', pending: '标记为待审核', blocked: '封禁' }[status];
+  if (!confirm(`确定将 ${username} ${actionText}？`)) return;
+  try {
+    const resp = await fetch('/api/admin/users/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeAdminToken}` },
+      body: JSON.stringify({ username, status })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '操作失败');
+    showToast(data.message || '操作成功', 'success');
+    loadAdminUsers();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
 async function loadAdminUsers() {
   if (!activeAdminToken) return;
   const listBody = document.getElementById('adminUsersList');
   if (!listBody) return;
-  listBody.innerHTML = '<tr class="empty-row"><td colspan="5">正在加载用户数据...</td></tr>';
+  listBody.innerHTML = '<tr class="empty-row"><td colspan="6">正在加载用户数据...</td></tr>';
 
   try {
     const resp = await fetch('/api/admin/users', {
@@ -401,27 +470,58 @@ async function loadAdminUsers() {
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || '加载用户失败');
 
-    const users = data.users || [];
-    if (users.length === 0) {
-      listBody.innerHTML = '<tr class="empty-row"><td colspan="5">暂无注册用户。</td></tr>';
-      return;
-    }
-
-    listBody.innerHTML = '';
-    for (const u of users) {
-      const created = u.createdAt ? new Date(u.createdAt).toLocaleString('zh-CN') : '未知';
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td><a href="javascript:void(0)" onclick="showUserLinks('${escapeHtmlAttr(u.username)}')" class="link-code" title="点击查看该用户的短链明细">📧 ${escapeHtml(u.username)}</a></td>
-        <td><span class="date-text">${created}</span></td>
-        <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${u.linkCount || 0} 条</span></td>
-        <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${u.totalClicks || 0} 次</span></td>
-        <td><button onclick="deleteAdminUser('${escapeHtmlAttr(u.username)}')" class="btn btn-danger btn-small">删除用户</button></td>
-      `;
-      listBody.appendChild(row);
-    }
+    allUsers = data.users || [];
+    renderAdminUsers();
   } catch (err) {
-    listBody.innerHTML = `<tr class="empty-row"><td colspan="5">加载失败：${escapeHtml(err.message)}</td></tr>`;
+    listBody.innerHTML = `<tr class="empty-row"><td colspan="6">加载失败：${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderAdminUsers() {
+  const listBody = document.getElementById('adminUsersList');
+  const pageInfo = document.getElementById('usersPageInfo');
+  const badge = document.getElementById('userTabBadge');
+
+  const pendingCount = allUsers.filter(u => u.status === 'pending').length;
+  if (badge) {
+    badge.classList.toggle('hidden', pendingCount === 0);
+    badge.textContent = pendingCount > 0 ? `${pendingCount} 待审` : '';
+  }
+
+  if (allUsers.length === 0) {
+    listBody.innerHTML = '<tr class="empty-row"><td colspan="6">暂无注册用户。</td></tr>';
+    if (pageInfo) pageInfo.textContent = '';
+    return;
+  }
+
+  const shown = allUsers.slice(0, usersPageSize);
+  listBody.innerHTML = '';
+  for (const u of shown) {
+    const created = u.createdAt ? new Date(u.createdAt).toLocaleString('zh-CN') : '未知';
+    const status = u.status || 'active';
+    const actions = [];
+    if (status === 'pending') actions.push(`<button onclick="setUserStatus('${escapeHtmlAttr(u.username)}','active')" class="btn btn-primary btn-small">✔ 通过审核</button>`);
+    if (status === 'blocked') actions.push(`<button onclick="setUserStatus('${escapeHtmlAttr(u.username)}','active')" class="btn btn-secondary btn-small">解封</button>`);
+    else if (status !== 'pending') actions.push(`<button onclick="setUserStatus('${escapeHtmlAttr(u.username)}','blocked')" class="btn btn-secondary btn-small">🚫 封禁</button>`);
+    if (status !== 'pending' && status !== 'blocked') actions.push(`<button onclick="setUserStatus('${escapeHtmlAttr(u.username)}','pending')" class="btn btn-secondary btn-small">取消资格</button>`);
+    actions.push(`<button onclick="deleteAdminUser('${escapeHtmlAttr(u.username)}')" class="btn btn-danger btn-small">删除</button>`);
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><a href="javascript:void(0)" onclick="showUserLinks('${escapeHtmlAttr(u.username)}')" class="link-code" title="点击查看该用户的短链明细">📧 ${escapeHtml(u.username)}</a></td>
+      <td>${userStatusBadge(status)}</td>
+      <td><span class="date-text">${created}</span></td>
+      <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${u.linkCount || 0} 条</span></td>
+      <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${u.totalClicks || 0} 次</span></td>
+      <td><div class="row-actions">${actions.join(' ')}</div></td>
+    `;
+    listBody.appendChild(row);
+  }
+
+  if (pageInfo) {
+    pageInfo.textContent = allUsers.length > usersPageSize
+      ? `已显示 ${shown.length} / 共 ${allUsers.length} 个用户（可在右上角调整每页显示数量）`
+      : `共 ${allUsers.length} 个用户`;
   }
 }
 

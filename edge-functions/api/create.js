@@ -59,6 +59,26 @@ export default async function onRequest(context) {
       });
     }
 
+    // 账户状态校验（防恶意注册：待审核/封禁用户不可生成）
+    if (authUser) {
+      const userRaw = await kv.get(`user:${authUser.username}`);
+      if (userRaw) {
+        try {
+          const user = typeof userRaw === 'string' ? JSON.parse(userRaw) : userRaw;
+          if (user.status === 'blocked') {
+            return new Response(JSON.stringify({ error: '该账户已被禁用，无法生成短链。' }), {
+              status: 403, headers: corsHeaders()
+            });
+          }
+          if (user.status === 'pending') {
+            return new Response(JSON.stringify({ error: '账户正在等待管理员审核，审核通过后才能生成短链。' }), {
+              status: 403, headers: corsHeaders()
+            });
+          }
+        } catch (e) { /* ignore corrupted record */ }
+      }
+    }
+
     if (!url) {
       return new Response(JSON.stringify({ error: 'URL or text is required.' }), {
         status: 400,

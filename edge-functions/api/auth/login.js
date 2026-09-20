@@ -66,6 +66,14 @@ export default async function onRequest(context) {
       });
     }
 
+    // 账户状态校验
+    if (user.status === 'blocked') {
+      return new Response(JSON.stringify({ error: '该账户已被禁用，如有疑问请联系管理员。' }), {
+        status: 403, headers: corsHeaders()
+      });
+    }
+    const loginWarning = user.status === 'pending' ? '账户正在等待管理员审核，审核通过前无法生成短链。' : null;
+
     const passwordHash = await hashPassword(password, user.salt || '');
     if (!timingSafeEqual(passwordHash, user.passwordHash || '')) {
       return new Response(JSON.stringify({ error: '邮箱或密码错误。' }), {
@@ -78,7 +86,8 @@ export default async function onRequest(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      message: '登录成功。',
+      message: loginWarning || '登录成功。',
+      warning: !!loginWarning,
       username: identity,
       email: identity,
       token,

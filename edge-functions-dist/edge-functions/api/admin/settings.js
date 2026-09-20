@@ -228,7 +228,8 @@ async function getSiteSettings(kv) {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return {
-      requireRegister: !!(parsed && parsed.requireRegister)
+      requireRegister: !!(parsed && parsed.requireRegister),
+      requireApproval: !!(parsed && parsed.requireApproval)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
@@ -311,7 +312,8 @@ export default async function onRequest(context) {
       const settings = await getSiteSettings(kv);
       return new Response(JSON.stringify({
         success: true,
-        requireRegister: settings.requireRegister
+        requireRegister: settings.requireRegister,
+        requireApproval: settings.requireApproval
       }), { status: 200, headers: corsHeaders() });
     }
 
@@ -324,18 +326,36 @@ export default async function onRequest(context) {
       });
     }
 
-    if (typeof body.requireRegister !== 'boolean') {
-      return new Response(JSON.stringify({ error: 'requireRegister 必须为布尔值。' }), {
+    const patch = {};
+    if (body.requireRegister !== undefined) {
+      if (typeof body.requireRegister !== 'boolean') {
+        return new Response(JSON.stringify({ error: 'requireRegister 必须为布尔值。' }), {
+          status: 400, headers: corsHeaders()
+        });
+      }
+      patch.requireRegister = body.requireRegister;
+    }
+    if (body.requireApproval !== undefined) {
+      if (typeof body.requireApproval !== 'boolean') {
+        return new Response(JSON.stringify({ error: 'requireApproval 必须为布尔值。' }), {
+          status: 400, headers: corsHeaders()
+        });
+      }
+      patch.requireApproval = body.requireApproval;
+    }
+    if (Object.keys(patch).length === 0) {
+      return new Response(JSON.stringify({ error: '未提供任何设置项（requireRegister / requireApproval）。' }), {
         status: 400, headers: corsHeaders()
       });
     }
 
-    await saveSiteSettings(kv, { requireRegister: body.requireRegister });
+    await saveSiteSettings(kv, patch);
 
     return new Response(JSON.stringify({
       success: true,
-      message: body.requireRegister ? '已开启：仅注册用户可生成短链。' : '已关闭：所有访客均可生成短链。',
-      requireRegister: body.requireRegister
+      message: `设置已保存：${patch.requireRegister !== undefined ? (patch.requireRegister ? '仅注册用户可生成短链' : '所有访客可生成短链') : ''}${patch.requireRegister !== undefined && patch.requireApproval !== undefined ? '；' : ''}${patch.requireApproval !== undefined ? (patch.requireApproval ? '新用户注册需审核' : '新用户注册免审核') : ''}`,
+      requireRegister: patch.requireRegister,
+      requireApproval: patch.requireApproval
     }), { status: 200, headers: corsHeaders() });
 
   } catch (err) {

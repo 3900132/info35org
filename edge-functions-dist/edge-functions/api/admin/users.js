@@ -228,7 +228,8 @@ async function getSiteSettings(kv) {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return {
-      requireRegister: !!(parsed && parsed.requireRegister)
+      requireRegister: !!(parsed && parsed.requireRegister),
+      requireApproval: !!(parsed && parsed.requireApproval)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
@@ -321,7 +322,8 @@ export default async function onRequest(context) {
           if (user && user.username) {
             users.push({
               username: user.username,
-              createdAt: user.createdAt || null
+              createdAt: user.createdAt || null,
+              status: user.status || 'active'
             });
           }
         } catch (e) { /* skip corrupted entries */ }
@@ -348,6 +350,7 @@ export default async function onRequest(context) {
     const result = users.map(u => ({
       username: u.username,
       createdAt: u.createdAt,
+      status: u.status || 'active',
       linkCount: (stats[u.username] || {}).linkCount || 0,
       totalClicks: (stats[u.username] || {}).totalClicks || 0
     })).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));

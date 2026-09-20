@@ -46,8 +46,11 @@ async function initAuth() {
   }
   setLoggedInView(false);
 
+  // 初始化页签状态；开启注册限制时自动切到注册页签（含验证码输入框）
+  switchAuthTab(siteSettings.requireRegister ? 'register' : 'login');
+
   if (siteSettings.requireRegister) {
-    showToast('本站已开启"注册用户才能生成短链"，请先登录或注册。', 'warning', 6000);
+    showToast('本站已开启"注册用户才能生成短链"，请先注册或登录。', 'warning', 6000);
   }
 }
 

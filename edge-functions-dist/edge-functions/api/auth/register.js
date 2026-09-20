@@ -228,7 +228,8 @@ async function getSiteSettings(kv) {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return {
-      requireRegister: !!(parsed && parsed.requireRegister)
+      requireRegister: !!(parsed && parsed.requireRegister),
+      requireApproval: !!(parsed && parsed.requireApproval)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
@@ -392,22 +393,30 @@ export default async function onRequest(context) {
     const salt = randomHex(16);
     const passwordHash = await hashPassword(password, salt);
 
+    // 是否需要管理员审核（防恶意注册）
+    const settings = await getSiteSettings(kv);
+    const status = settings.requireApproval ? 'pending' : 'active';
+
     const createdAt = new Date().toISOString();
     await kv.put(`user:${email}`, JSON.stringify({
       username: email, // 邮箱即账户名（兼容后台用户列表与短链归属逻辑）
       email,
       salt,
       passwordHash,
-      createdAt
+      createdAt,
+      status
     }));
 
     const { token, expiresAt } = await createUserToken(kv, email);
 
     return new Response(JSON.stringify({
       success: true,
-      message: '注册成功，已自动登录。',
+      message: status === 'pending'
+        ? '注册成功！账户已提交审核，管理员通过后即可生成短链。'
+        : '注册成功，已自动登录。',
       username: email,
       email,
+      status,
       token,
       expiresAt
     }), { status: 200, headers: corsHeaders() });

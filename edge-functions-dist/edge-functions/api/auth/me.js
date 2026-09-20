@@ -228,7 +228,8 @@ async function getSiteSettings(kv) {
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return {
-      requireRegister: !!(parsed && parsed.requireRegister)
+      requireRegister: !!(parsed && parsed.requireRegister),
+      requireApproval: !!(parsed && parsed.requireApproval)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
