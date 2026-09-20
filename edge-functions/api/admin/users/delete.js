@@ -67,7 +67,7 @@ export default async function onRequest(context) {
         // Invalidate all session tokens belonging to this user
         let cursor = null;
         do {
-          const res = await kv.list({ prefix: 'token:', limit: 100, cursor });
+          const res = await kv.list(cursor ? { prefix: 'token:', limit: 100, cursor } : { prefix: 'token:', limit: 100 });
           const batch = res.keys || [];
           const toDelete = [];
           for (const k of batch) {

@@ -309,7 +309,7 @@ export default async function onRequest(context) {
     const users = [];
     let cursor = null;
     do {
-      const res = await kv.list({ prefix: 'user:', limit: 100, cursor });
+      const res = await kv.list(cursor ? { prefix: 'user:', limit: 100, cursor } : { prefix: 'user:', limit: 100 });
       const batch = res.keys || [];
       for (const k of batch) {
         const keyName = typeof k === 'string' ? k : (k?.name || k?.key);
