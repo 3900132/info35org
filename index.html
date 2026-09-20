@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeLink - 极速边缘短链接服务 | 免费短网址生成与跳转统计</title>
+  <meta name="description" content="EdgeLink 是基于腾讯云 EdgeOne Pages 的免费极速短链接服务：全球边缘节点毫秒级重定向、支持批量生成短网址与文字分享、点击量统计分析、链接有效期与次数限制、二维码生成，可选注册用户管理。Serverless 架构开箱即用。">
+  <meta name="keywords" content="短链接, 短网址, URL 短链接, 短链生成器, 链接缩短, 短链接服务, EdgeOne, Serverless, 边缘计算, 免费短链接, 二维码生成, 点击统计">
+  <meta name="author" content="info35">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="theme-color" content="#0d111a">
+  <link rel="canonical" href="https://go.info35.org/">
+
+  <!-- Open Graph (社交平台分享) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="EdgeLink">
+  <meta property="og:title" content="EdgeLink - 极速边缘短链接服务">
+  <meta property="og:description" content="全球边缘节点毫秒级重定向的免费短链接服务：批量短网址生成、文字分享、点击统计、二维码、链接有效期控制，开箱即用。">
+  <meta property="og:url" content="https://go.info35.org/">
+  <meta property="og:locale" content="zh_CN">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="EdgeLink - 极速边缘短链接服务">
+  <meta name="twitter:description" content="全球边缘节点毫秒级重定向的免费短链接服务：批量短网址生成、文字分享、点击统计、二维码，开箱即用。">
+
+  <!-- 结构化数据 (JSON-LD)：帮助搜索引擎与 AI 引擎理解产品 -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "name": "EdgeLink",
+        "url": "https://go.info35.org/",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web",
+        "description": "基于腾讯云 EdgeOne Pages 的极速 Serverless 短链接服务，支持全球边缘重定向、批量短网址生成、文字分享、点击统计、二维码生成与可选的用户注册管理。",
+        "inLanguage": "zh-CN",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY" },
+        "featureList": [
+          "全球边缘节点毫秒级短链重定向",
+          "批量短网址与文字分享生成",
+          "实时点击量统计与 7 天趋势图",
+          "链接有效期 (TTL) 与查看次数限制",
+          "高清二维码一键生成下载",
+          "可选注册用户体系与短链归属管理"
+        ],
+        "author": { "@type": "Person", "name": "info35", "url": "https://github.com/3900132" },
+        "license": "https://opensource.org/licenses/MIT"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "EdgeLink 是什么？",
+            "acceptedAnswer": { "@type": "Answer", "text": "EdgeLink 是一款基于腾讯云 EdgeOne Pages 的开源免费短链接服务，利用全球边缘节点实现毫秒级重定向，支持短网址生成、文字分享、点击统计与二维码生成。" }
+          },
+          {
+            "@type": "Question",
+            "name": "使用 EdgeLink 生成短链接需要注册吗？",
+            "acceptedAnswer": { "@type": "Answer", "text": "默认无需注册即可生成短链接。站点管理员可在后台开启“仅注册用户可生成短链”模式，开启后需登录使用，注册用户的短链会归属到账户并可查看点击统计。" }
+          },
+          {
+            "@type": "Question",
+            "name": "EdgeLink 的短链接有多快？",
+            "acceptedAnswer": { "@type": "Answer", "text": "重定向逻辑在距离访客最近的全球边缘计算节点执行，无冷启动，毫秒级响应。" }
+          },
+          {
+            "@type": "Question",
+            "name": "EdgeLink 可以设置链接有效期和查看次数限制吗？",
+            "acceptedAnswer": { "@type": "Answer", "text": "可以。创建短链时可设置 TTL 有效期（1小时至30天），到期自动失效；也可设置查看次数上限（如阅后即焚），超限后自动销毁。" }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔗</text></svg>">
+  
+  <!-- Self-hosted Fonts (no Google Fonts dependency) -->
+  <link rel="preload" href="/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/fonts.css">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Local QR Code Library (0ms latency, offline-capable) -->
+  <script src="qrcode.min.js" defer></script>
+</head>
+<body class="dark-mode">
+  <div class="bg-glow"></div>
+  
+  <div class="container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">⚡</span>
+        <h1 class="logo-text">Edge<span>Link</span></h1>
+      </div>
+      <p class="tagline">基于腾讯 EdgeOne Pages 部署的极速短链接平台</p>
+      
+      <!-- System status -->
+      <div class="status-indicator">
+        <div class="status-item" id="nodeStatus">
+          <span class="status-dot green animate-pulse"></span>
+          <span>边缘计算节点: 正常运行</span>
+        </div>
+        <div class="status-item" id="kvStatus">
+          <span class="status-dot green"></span>
+          <span>EdgeOne KV: 已连接</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-content">
+      
+      <!-- Section 1: Link Shortener Dashboard -->
+      <section id="panelShortener" class="content-panel active">
+
+        <!-- User Auth Card -->
+        <div id="userAuthCard" class="card glass">
+          <!-- Logged out view -->
+          <div id="authLoggedOut">
+            <div class="card-header">
+              <h2>用户登录 / 注册</h2>
+              <p id="authHint">登录后您的短链将归属到您的账户，可在管理后台查看统计。</p>
+            </div>
+            <div class="auth-tabs" style="display:flex;gap:10px;margin-bottom:16px;">
+              <button type="button" id="tabLogin" onclick="switchAuthTab('login')" class="btn btn-secondary" style="flex:1;">登录</button>
+              <button type="button" id="tabRegister" onclick="switchAuthTab('register')" class="btn btn-secondary" style="flex:1;">注册</button>
+            </div>
+            <form id="authForm" onsubmit="handleAuthSubmit(event)">
+              <div class="form-group">
+                <label for="authUsername">用户名 <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <span class="input-icon">👤</span>
+                  <input type="text" id="authUsername" placeholder="3-20 位字母、数字、短横线或下划线" required autocomplete="username">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="authPassword">密码 <span class="required">*</span></label>
+                <div class="input-wrapper">
+                  <span class="input-icon">🔒</span>
+                  <input type="password" id="authPassword" placeholder="6-72 位密码" required autocomplete="current-password">
+                </div>
+              </div>
+              <button type="submit" id="btnAuthSubmit" class="btn btn-primary" style="width:100%;">登录</button>
+            </form>
+          </div>
+          <!-- Logged in view -->
+          <div id="authLoggedIn" class="hidden">
+            <div class="card-header flex-header">
+              <div>
+                <h2>👋 欢迎回来，<span id="authDisplayName"></span></h2>
+                <p>您生成的短链已归属到当前账户，并计入点击统计。</p>
+              </div>
+              <div class="header-actions">
+                <button onclick="toggleMyLinks()" id="btnToggleMyLinks" class="btn btn-secondary">📋 我的短链</button>
+                <button onclick="handleLogout()" class="btn btn-danger">退出登录</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Links Panel (visible when logged in) -->
+        <div id="myLinksCard" class="card glass hidden">
+          <div class="card-header flex-header">
+            <div>
+              <h3>我的短链与点击统计</h3>
+              <p>当前账户生成的所有短链，数据实时来自边缘节点。</p>
+            </div>
+            <button onclick="loadMyLinks()" class="btn btn-secondary">🔄 刷新</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>短地址</th>
+                  <th>类型</th>
+                  <th>原始链接/内容</th>
+                  <th>点击统计</th>
+                  <th>创建时间</th>
+                </tr>
+              </thead>
+              <tbody id="myLinksList">
+                <tr class="empty-row"><td colspan="5">暂无数据，生成短链后这里会自动出现。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      <!-- Section 1: Link Shortener Dashboard -->
+      <section id="panelShortener" class="content-panel active">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>生成短链接</h2>
+            <p>输入您的原始内容，EdgeLink 将立即为您生成全球边缘节点加速的极短跳转路径。</p>
+          </div>
+          
+          <form id="shortenForm" onsubmit="handleShorten(event)">
+            <div class="form-group">
+              <label for="longUrl">长链接 URL 或文字内容 <span class="required">*</span></label>
+              <div class="input-wrapper">
+                <span class="input-icon" style="top: 14px; align-self: flex-start;">🌐</span>
+                <textarea id="longUrl" placeholder="输入 URL 进行缩短，支持每行一个批量生成&#10;https://example.com&#10;https://github.com&#10;&#10;或直接输入文字内容进行文字分享..." required style="height: 100px; resize: vertical; padding-top: 14px;"></textarea>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="customCode">自定义别名（可选）</label>
+              <div class="input-wrapper">
+                <span class="input-icon">✍️</span>
+                <input type="text" id="customCode" placeholder="例如: promo2026 (留空则随机生成)" pattern="^[a-zA-Z0-9-_]{3,20}$" title="3-20位英文字母、数字、短横线或下划线">
+              </div>
+              <small class="helper-text">仅支持 3-20 位字母、数字、短横线 (-) 和下划线 (_)。</small>
+            </div>
+
+            <div class="form-group">
+              <label for="viewLimit">查看次数限制（可选）</label>
+              <div class="input-wrapper">
+                <span class="input-icon">👁️</span>
+                <select id="viewLimit" class="custom-select" onchange="toggleCustomLimit()">
+                  <option value="">无限制</option>
+                  <option value="1">1次 (阅后即焚)</option>
+                  <option value="5">5次</option>
+                  <option value="10">10次</option>
+                  <option value="custom">自定义次数...</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="ttl">链接有效期（可选）</label>
+              <div class="input-wrapper">
+                <span class="input-icon">⏰</span>
+                <select id="ttl" class="custom-select">
+                  <option value="">永久有效</option>
+                  <option value="3600">1小时</option>
+                  <option value="86400">24小时</option>
+                  <option value="259200">3天</option>
+                  <option value="604800">7天</option>
+                  <option value="2592000">30天</option>
+                </select>
+              </div>
+              <small class="helper-text">过期后链接将自动失效并被清理。</small>
+            </div>
+
+            <div id="customLimitGroup" class="form-group hidden">
+              <label for="customLimit">输入自定义次数 <span class="required">*</span></label>
+              <div class="input-wrapper">
+                <span class="input-icon">🔢</span>
+                <input type="number" id="customLimit" min="1" placeholder="输入允许查看的最高次数">
+              </div>
+            </div>
+            
+            <button type="submit" id="btnSubmit" class="btn btn-primary btn-glow">
+              <span class="btn-text">生成短链接/分享</span>
+              <span class="btn-loader hidden"></span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Success Result Panel (Hidden by default) -->
+        <div id="resultCard" class="card glass success-card hidden">
+          <div class="success-glow"></div>
+          <div class="card-header">
+            <div class="success-header">
+              <span class="success-badge-icon">✓</span>
+              <h3>链接/内容分享已生成！</h3>
+            </div>
+          </div>
+          
+          <div class="result-box">
+            <div class="result-field">
+              <label>生成的短网址</label>
+              <div class="copy-input-group">
+                <input type="text" id="shortUrlOutput" readonly>
+                <button onclick="copyToClipboard('shortUrlOutput')" class="btn btn-secondary" title="复制短链接">
+                  复制
+                </button>
+              </div>
+            </div>
+            
+            <div class="result-actions">
+              <a id="btnVisitLink" href="#" target="_blank" class="btn btn-link">⚡ 访问链接</a>
+              <button onclick="showQRCode()" class="btn btn-link">🖼️ 二维码</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Section -->
+        <div class="card glass recent-history">
+          <div class="card-header flex-header">
+            <div>
+              <h3>本地历史记录</h3>
+              <p>您在此设备上产生的记录，数据将实时从边缘计算节点获取点击统计。</p>
+            </div>
+            <button onclick="refreshHistoryStats()" class="btn-icon" title="刷新统计数据">
+              🔄 刷新统计
+            </button>
+          </div>
+          
+          <div class="table-container">
+            <table id="historyTable">
+              <thead>
+                <tr>
+                  <th>短地址</th>
+                  <th>类型</th>
+                  <th>原始地址/内容</th>
+                  <th>状态 (点击)</th>
+                  <th>次数限制</th>
+                  <th>创建时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="historyList">
+                <tr class="empty-row">
+                  <td colspan="7">暂无生成记录，立即在上方创建一个吧！</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      
+    </main>
+
+    <!-- QR Code Modal (Hidden by default) -->
+    <div id="qrModal" class="modal hidden">
+      <div class="modal-overlay" onclick="closeQRModal()"></div>
+      <div class="modal-content glass">
+        <div class="modal-header">
+          <h3>短链接二维码</h3>
+          <button class="close-btn" onclick="closeQRModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="qrcodeContainer"></div>
+          <p id="qrUrlText"></p>
+          <small>扫描上方二维码即可直接在手机端打开短链接。</small>
+        </div>
+        <div class="modal-footer">
+          <button id="btnDownloadQR" class="btn btn-secondary">下载二维码</button>
+          <button onclick="closeQRModal()" class="btn btn-primary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 EdgeLink | 由 <a href="https://github.com/3900132/info35org" target="_blank" style="color: var(--accent-color); text-decoration: none;">keaidang</a> 创建 点击访问开源存储库一键部署</p>
+    </footer>
+  </div>
+
+  <!-- Client-side JavaScript Logic -->
+  <script src="app.js" defer></script>
+</body>
+</html>

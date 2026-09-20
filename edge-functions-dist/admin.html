@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeLink - 管理控制台</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
+  
+  <!-- Self-hosted Fonts (no Google Fonts dependency) -->
+  <link rel="preload" href="/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/fonts.css">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Local QR Code Library (0ms latency, offline-capable) -->
+  <script src="qrcode.min.js" defer></script>
+</head>
+<body class="dark-mode">
+  <div class="bg-glow"></div>
+  
+  <div class="container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">⚙️</span>
+        <h1 class="logo-text">Edge<span>Link Admin</span></h1>
+      </div>
+      <p class="tagline">EdgeLink 短链接平台全球数据管理后台</p>
+    </header>
+
+    <!-- Content Area -->
+    <main class="app-content">
+      
+      <!-- Auth Screen -->
+      <div id="adminAuthCard" class="card glass admin-auth-card">
+        <div class="card-header">
+          <h2>管理员身份验证</h2>
+          <p>请输入在 EdgeOne Pages 中配置的 <strong>ADMIN_TOKEN</strong> 环境变量以进行身份验证。</p>
+        </div>
+        
+        <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
+          <div class="form-group">
+            <label for="adminToken">管理员密钥 (Token) <span class="required">*</span></label>
+            <div class="input-wrapper">
+              <span class="input-icon">🔑</span>
+              <input type="password" id="adminToken" placeholder="输入 ADMIN_TOKEN" required autocomplete="current-password">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            验证并进入
+          </button>
+        </form>
+        <div style="text-align: center; margin-top: 20px;">
+          <a href="/" style="color: var(--text-secondary); font-size: 0.9rem; text-decoration: none;">← 返回首页生成器</a>
+        </div>
+      </div>
+
+      <!-- Admin Control Panel (Hidden until authorized) -->
+      <div id="adminConsole" class="admin-console hidden">
+        
+        <!-- Summary Cards -->
+        <div class="stats-grid">
+          <div class="stats-card glass">
+            <span class="stats-icon">🔗</span>
+            <div class="stats-info">
+              <div class="stats-label">短链总数</div>
+              <div id="statTotalLinks" class="stats-number">0</div>
+            </div>
+          </div>
+          <div class="stats-card glass">
+            <span class="stats-icon">📈</span>
+            <div class="stats-info">
+              <div class="stats-label">累计跳转点击</div>
+              <div id="statTotalClicks" class="stats-number">0</div>
+            </div>
+          </div>
+          <div class="stats-card glass">
+            <span class="stats-icon">⚡</span>
+            <div class="stats-info">
+              <div class="stats-label">数据库状态</div>
+              <div class="stats-number text-success">活动 (KV)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trend Chart -->
+        <div class="card glass trend-card">
+          <div class="card-header">
+            <h2>点击趋势（近 7 天）</h2>
+            <p>EdgeOne KV 中的每日点击统计数据。</p>
+          </div>
+          <div id="trendChart" class="trend-chart"></div>
+        </div>
+
+        <!-- Site Settings -->
+        <div class="card glass">
+          <div class="card-header flex-header">
+            <div>
+              <h2>站点设置</h2>
+              <p>控制是否只有注册用户才能生成短链。</p>
+            </div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+              <input type="checkbox" id="requireRegisterToggle" onchange="handleRequireRegisterToggle(this)" style="width:20px;height:20px;cursor:pointer;">
+              <span id="requireRegisterLabel" style="font-size:0.9rem;">仅注册用户可生成短链</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- User Management -->
+        <div class="card glass">
+          <div class="card-header flex-header">
+            <div>
+              <h2>用户管理</h2>
+              <p>注册用户列表及其短链数量与累计点击。<span style="color:var(--accent-color);">点击用户名可查看该用户的全部短链明细。</span></p>
+            </div>
+            <div class="header-actions">
+              <button onclick="loadAdminUsers()" class="btn btn-secondary">🔄 刷新用户</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>用户名</th>
+                  <th>注册时间</th>
+                  <th>短链数量</th>
+                  <th>累计点击</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersList">
+                <tr class="empty-row"><td colspan="5">正在加载用户数据...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- All Links List -->
+        <div class="card glass admin-links-card">
+          <div class="card-header flex-header">
+            <div>
+              <h2>所有短链接</h2>
+              <p>已保存在 EdgeOne KV 存储空间的所有短链列表。</p>
+            </div>
+            <div class="header-actions">
+              <input type="text" id="adminSearchInput" oninput="filterAdminLinks()" placeholder="搜索短地址/内容..." class="search-input">
+              <button onclick="exportCSV()" class="btn btn-secondary">
+                📥 导出CSV
+              </button>
+              <button id="btnBulkDelete" onclick="handleBulkDelete()" class="btn btn-danger hidden">
+                🗑️ 批量删除 (<span id="selectedCount">0</span>)
+              </button>
+              <button onclick="fetchAdminLinks()" class="btn btn-secondary">
+                🔄 刷新
+              </button>
+              <button onclick="handleAdminLogout()" class="btn btn-danger">
+                🚪 退出
+              </button>
+            </div>
+          </div>
+          
+          <div class="table-container">
+            <table id="adminTable">
+              <thead>
+                <tr>
+                  <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="cursor: pointer;"></th>
+                  <th>短地址</th>
+                  <th>类型</th>
+                  <th>内容/原始链接</th>
+                  <th>状态 (点击)</th>
+                  <th>次数限制</th>
+                  <th>创建时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="adminLinksList">
+                <tr class="empty-row">
+                  <td colspan="8">正在加载 KV 数据...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div id="loadMoreContainer" class="hidden" style="text-align:center;padding:16px;">
+            <button id="btnLoadMore" onclick="loadMoreLinks()" class="btn btn-secondary" style="width:auto;padding:10px 24px;">
+              加载更多...
+            </button>
+          </div>
+        </div>
+      </div>
+      
+    </main>
+
+    <!-- QR Code Modal (Hidden by default) -->
+    <div id="qrModal" class="modal hidden">
+      <div class="modal-overlay" onclick="closeQRModal()"></div>
+      <div class="modal-content glass">
+        <div class="modal-header">
+          <h3>短链接二维码</h3>
+          <button class="close-btn" onclick="closeQRModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="qrcodeContainer"></div>
+          <p id="qrUrlText"></p>
+          <small>扫描上方二维码即可直接在手机端打开短链接。</small>
+        </div>
+        <div class="modal-footer">
+          <button id="btnDownloadQR" class="btn btn-secondary">下载二维码</button>
+          <button onclick="closeQRModal()" class="btn btn-primary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text Preview Modal (Hidden by default) -->
+    <div id="previewModal" class="modal hidden">
+      <div class="modal-overlay" onclick="closePreviewModal()"></div>
+      <div class="modal-content glass" style="max-width: 600px; text-align: left;">
+        <div class="modal-header">
+          <h3>文字内容预览</h3>
+          <button class="close-btn" onclick="closePreviewModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="align-items: stretch;">
+          <div class="badge badge-info" id="previewBadge" style="margin-bottom: 12px; display: inline-flex; width: fit-content; border: 1px solid rgba(190, 100, 50, 0.2); background: rgba(190, 100, 50, 0.08); color: var(--accent-color); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;"></div>
+          <pre id="previewTextContent" style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-primary); white-space: pre-wrap; word-break: break-all; max-height: 350px; overflow-y: auto;"></pre>
+        </div>
+        <div class="modal-footer">
+          <button onclick="copyPreviewText()" class="btn btn-primary" style="flex: 1;">复制文本</button>
+          <button onclick="closePreviewModal()" class="btn btn-secondary" style="flex: 1;">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Links Drill-down Modal -->
+    <div id="userLinksModal" class="modal hidden">
+      <div class="modal-overlay" onclick="closeUserLinksModal()"></div>
+      <div class="modal-content glass" style="max-width: 900px; text-align: left;">
+        <div class="modal-header">
+          <h3>用户短链明细：<span id="userLinksTitle"></span></h3>
+          <button class="close-btn" onclick="closeUserLinksModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="align-items: stretch;">
+          <p id="userLinksSummary" style="margin-bottom: 12px; color: var(--text-secondary); font-size: 0.9rem;"></p>
+          <div class="table-container" style="max-height: 420px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>短地址</th>
+                  <th>类型</th>
+                  <th>原始链接/内容</th>
+                  <th>点击统计</th>
+                  <th>创建时间</th>
+                </tr>
+              </thead>
+              <tbody id="userLinksList"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button onclick="closeUserLinksModal()" class="btn btn-primary">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>&copy; 2026 EdgeLink | 由 <a href="https://github.com/3900132/info35org" target="_blank" style="color: var(--accent-color); text-decoration: none;">keaidang</a> 创建 点击访问开源存储库一键部署</p>
+    </footer>
+  </div>
+
+  <!-- Admin Panel JS Logic -->
+  <script src="admin.js" defer></script>
+</body>
+</html>

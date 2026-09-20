@@ -1,0 +1,17 @@
+{
+  "name": "edgelink",
+  "version": "1.0.0",
+  "description": "Short Link Service on EdgeOne Pages",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "node scripts/build.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

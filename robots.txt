@@ -1,0 +1,39 @@
+# EdgeLink - robots.txt
+# https://go.info35.org
+
+User-agent: *
+Allow: /
+# 管理后台与 API 接口不对外索引
+Disallow: /admin
+Disallow: /admin.html
+Disallow: /api/
+
+# AI 爬虫：欢迎抓取首页公开内容 (GEO 优化)
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /admin
+Disallow: /api/
+
+# 站点地图与 AI 可读文档
+Sitemap: https://go.info35.org/sitemap.xml
+# LLM 友好文档: https://go.info35.org/llms.txt
