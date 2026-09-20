@@ -215,6 +215,7 @@ EdgeLink 支持可选的注册用户体系，生成短链的权限由管理员�
 
 ## 📄 开源许可 & 作者信息
 
+- **感谢原作者**：[keaidang](https://github.com/keaidang/edgelink)
 - **作者**：[info35](https://github.com/3900132)
 - **开源仓库**：[GitHub - 3900132/info35org](https://github.com/3900132/info35org)
 
