@@ -298,10 +298,18 @@ async function listAllLinkKeys(kv) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const CODE_TTL_MS = 10 * 60 * 1000;
 
-// 阿里云 RPC 签名所需的百分号编码（RFC3986）
+// 阿里云 RPC 签名所需的百分号编码。
+// 阿里云规范化规则：仅 A-Z a-z 0-9 - _ . ~ 不编码，其余一律转义为 %XY。
+// 注意 encodeURIComponent 不转义 ! ' ( ) * ~，其中 ! ' ( ) 必须补齐转义，
+// 否则邮件 HTML 中的引号/括号（如 font-family:'...'、rgba(...)）会使我方签名串
+// 与阿里云服务端重算的串不一致，返回 400 SignatureDoesNotMatch。
 function aliyunPercentEncode(str) {
   return encodeURIComponent(String(str))
     .replace(/\+/g, '%20')
+    .replace(/!/g, '%21')
+    .replace(/'/g, '%27')
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29')
     .replace(/\*/g, '%2A')
     .replace(/%7E/g, '~');
 }
