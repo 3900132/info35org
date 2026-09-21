@@ -15,6 +15,14 @@
     {
       "source": "/admin-user",
       "destination": "/admin-user.html"
+    },
+    {
+      "source": "/admin-links",
+      "destination": "/admin-links.html"
+    },
+    {
+      "source": "/admin-reports",
+      "destination": "/admin-reports.html"
     }
   ]
 }

@@ -34,7 +34,9 @@ export default async function onRequest(context) {
         success: true,
         requireRegister: settings.requireRegister,
         requireApproval: settings.requireApproval,
-        disableRegister: settings.disableRegister
+        disableRegister: settings.disableRegister,
+        guestLinkRetentionDays: settings.guestLinkRetentionDays,
+        redirectDelaySeconds: settings.redirectDelaySeconds
       }), { status: 200, headers: corsHeaders() });
     }
 
@@ -72,8 +74,26 @@ export default async function onRequest(context) {
       }
       patch.disableRegister = body.disableRegister;
     }
+    if (body.guestLinkRetentionDays !== undefined) {
+      const n = parseInt(body.guestLinkRetentionDays, 10);
+      if (!Number.isFinite(n) || n < 0 || n > 365) {
+        return new Response(JSON.stringify({ error: 'guestLinkRetentionDays 必须为 0-365 的整数（0 表示永久保留）。' }), {
+          status: 400, headers: corsHeaders()
+        });
+      }
+      patch.guestLinkRetentionDays = n;
+    }
+    if (body.redirectDelaySeconds !== undefined) {
+      const n = parseInt(body.redirectDelaySeconds, 10);
+      if (!Number.isFinite(n) || n < 0 || n > 60) {
+        return new Response(JSON.stringify({ error: 'redirectDelaySeconds 必须为 0-60 的整数（0 表示立即跳转）。' }), {
+          status: 400, headers: corsHeaders()
+        });
+      }
+      patch.redirectDelaySeconds = n;
+    }
     if (Object.keys(patch).length === 0) {
-      return new Response(JSON.stringify({ error: '未提供任何设置项（requireRegister / requireApproval / disableRegister）。' }), {
+      return new Response(JSON.stringify({ error: '未提供任何设置项（requireRegister / requireApproval / disableRegister / guestLinkRetentionDays / redirectDelaySeconds）。' }), {
         status: 400, headers: corsHeaders()
       });
     }
@@ -85,11 +105,15 @@ export default async function onRequest(context) {
       message: `设置已保存：${[
         patch.requireRegister !== undefined ? (patch.requireRegister ? '仅注册用户可生成短链' : '所有访客可生成短链') : null,
         patch.requireApproval !== undefined ? (patch.requireApproval ? '新用户注册需审核' : '新用户注册免审核') : null,
-        patch.disableRegister !== undefined ? (patch.disableRegister ? '禁止新用户注册' : '允许新用户注册') : null
+        patch.disableRegister !== undefined ? (patch.disableRegister ? '禁止新用户注册' : '允许新用户注册') : null,
+        patch.guestLinkRetentionDays !== undefined ? (patch.guestLinkRetentionDays > 0 ? `非注册用户短链保留 ${patch.guestLinkRetentionDays} 天` : '短链永久保留') : null,
+        patch.redirectDelaySeconds !== undefined ? (patch.redirectDelaySeconds > 0 ? `跳转页停留 ${patch.redirectDelaySeconds} 秒` : '跳转页立即跳转') : null
       ].filter(Boolean).join('；') || '无变更'}`,
       requireRegister: patch.requireRegister,
       requireApproval: patch.requireApproval,
-      disableRegister: patch.disableRegister
+      disableRegister: patch.disableRegister,
+      guestLinkRetentionDays: patch.guestLinkRetentionDays,
+      redirectDelaySeconds: patch.redirectDelaySeconds
     }), { status: 200, headers: corsHeaders() });
 
   } catch (err) {

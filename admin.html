@@ -127,57 +127,43 @@
           </div>
         </div>
 
-        <!-- All Links List -->
-        <div class="card glass admin-links-card">
+        <!-- Storage & Redirect Settings -->
+        <div class="card glass">
           <div class="card-header flex-header">
             <div>
-              <h2>所有短链接</h2>
-              <p>已保存在 EdgeOne KV 存储空间的所有短链列表。</p>
+              <h2>存储与跳转设置</h2>
+              <p>控制 KV 中短链的自动清理策略与跳转中间页停留时间。清理随访问在后台自动执行（约每 6 小时一轮）。</p>
+            </div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <label style="display:flex;align-items:center;gap:10px;">
+                  <span style="font-size:0.9rem;">非注册用户短链保留</span>
+                  <input type="number" id="guestRetentionDaysInput" min="0" max="365" value="7" style="width:70px;background:rgba(255,255,255,0.06);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);padding:4px 8px;">
+                  <span style="font-size:0.9rem;">天（0 = 永久保留；即使访客选了更长的有效期，也按此上限清理）</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:10px;">
+                  <span style="font-size:0.9rem;">跳转中间页停留</span>
+                  <input type="number" id="redirectDelayInput" min="0" max="60" value="3" style="width:70px;background:rgba(255,255,255,0.06);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);padding:4px 8px;">
+                  <span style="font-size:0.9rem;">秒（0 = 立即跳转）</span>
+                </label>
+                <div style="display:flex;gap:10px;">
+                  <button onclick="handleStorageSettingsSave(this)" class="btn btn-primary" style="width:auto;padding:8px 24px;">保存设置</button>
+                  <button onclick="handleManualCleanup(this)" class="btn btn-secondary" style="width:auto;padding:8px 24px;">🧹 立即清理 KV</button>
+                </div>
+              </div>
+          </div>
+        </div>
+
+        <!-- All Links（已拆分为独立页面） -->
+        <div class="card glass">
+          <div class="card-header flex-header">
+            <div>
+              <h2>短链与反馈管理</h2>
+              <p>所有短链接与用户举报反馈已拆分为独立页面，避免仪表盘过长。</p>
             </div>
             <div class="header-actions">
-              <span style="font-size:0.85rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;">每页显示 <input type="number" id="linksPageSize" value="30" min="10" max="500" onchange="applyLinksPageSize()" style="width:64px;background:rgba(255,255,255,0.06);border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);padding:4px 8px;"> 条</span>
-              <input type="text" id="adminSearchInput" oninput="filterAdminLinks()" placeholder="搜索短地址/内容..." class="search-input">
-              <button onclick="exportCSV()" class="btn btn-secondary">
-                📥 导出CSV
-              </button>
-              <button id="btnBulkDelete" onclick="handleBulkDelete()" class="btn btn-danger hidden">
-                🗑️ 批量删除 (<span id="selectedCount">0</span>)
-              </button>
-              <button onclick="fetchAdminLinks()" class="btn btn-secondary">
-                🔄 刷新
-              </button>
-              <button onclick="handleAdminLogout()" class="btn btn-danger">
-                🚪 退出
-              </button>
+              <a href="/admin-links" class="btn btn-primary" style="text-decoration:none;">📋 所有短链</a>
+              <a href="/admin-reports" class="btn btn-secondary" style="text-decoration:none;">🚩 举报反馈</a>
             </div>
-          </div>
-          
-          <div class="table-container">
-            <table id="adminTable">
-              <thead>
-                <tr>
-                  <th style="width: 40px; text-align: center;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="cursor: pointer;"></th>
-                  <th>短地址</th>
-                  <th>类型</th>
-                  <th>内容/原始链接</th>
-                  <th>状态 (点击)</th>
-                  <th>次数限制</th>
-                  <th>创建时间</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody id="adminLinksList">
-                <tr class="empty-row">
-                  <td colspan="8">正在加载 KV 数据...</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          
-          <div id="loadMoreContainer" class="hidden" style="text-align:center;padding:16px;">
-            <button id="btnLoadMore" onclick="loadMoreLinks()" class="btn btn-secondary" style="width:auto;padding:10px 24px;">
-              加载更多...
-            </button>
           </div>
         </div>
 
@@ -220,45 +206,6 @@
       </div>
 
     </main>
-
-    <!-- QR Code Modal (Hidden by default) -->
-    <div id="qrModal" class="modal hidden">
-      <div class="modal-overlay" onclick="closeQRModal()"></div>
-      <div class="modal-content glass">
-        <div class="modal-header">
-          <h3>短链接二维码</h3>
-          <button class="close-btn" onclick="closeQRModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div id="qrcodeContainer"></div>
-          <p id="qrUrlText"></p>
-          <small>扫描上方二维码即可直接在手机端打开短链接。</small>
-        </div>
-        <div class="modal-footer">
-          <button id="btnDownloadQR" class="btn btn-secondary">下载二维码</button>
-          <button onclick="closeQRModal()" class="btn btn-primary">关闭</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Text Preview Modal (Hidden by default) -->
-    <div id="previewModal" class="modal hidden">
-      <div class="modal-overlay" onclick="closePreviewModal()"></div>
-      <div class="modal-content glass" style="max-width: 600px; text-align: left;">
-        <div class="modal-header">
-          <h3>文字内容预览</h3>
-          <button class="close-btn" onclick="closePreviewModal()">&times;</button>
-        </div>
-        <div class="modal-body" style="align-items: stretch;">
-          <div class="badge badge-info" id="previewBadge" style="margin-bottom: 12px; display: inline-flex; width: fit-content; border: 1px solid rgba(190, 100, 50, 0.2); background: rgba(190, 100, 50, 0.08); color: var(--accent-color); padding: 4px 10px; border-radius: 4px; font-size: 0.8rem;"></div>
-          <pre id="previewTextContent" style="background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.9rem; color: var(--text-primary); white-space: pre-wrap; word-break: break-all; max-height: 350px; overflow-y: auto;"></pre>
-        </div>
-        <div class="modal-footer">
-          <button onclick="copyPreviewText()" class="btn btn-primary" style="flex: 1;">复制文本</button>
-          <button onclick="closePreviewModal()" class="btn btn-secondary" style="flex: 1;">关闭</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Toast Notifications Container -->
     <div id="toastContainer" class="toast-container"></div>

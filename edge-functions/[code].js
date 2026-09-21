@@ -1,4 +1,4 @@
-import { getKV, escapeHtml } from './lib/kv-helpers.js';
+import { getKV, escapeHtml, getSiteSettings, maybeCleanupExpiredLinks } from './lib/kv-helpers.js';
 
 function htmlPage(title, bodyContent, style = '') {
   return `<!DOCTYPE html>
@@ -187,7 +187,8 @@ function htmlPage(title, bodyContent, style = '') {
 </html>`;
 }
 
-function redirectHtmlPage(url) {
+function redirectHtmlPage(url, delaySeconds = 0, code = '') {
+  const delay = Math.max(0, parseInt(delaySeconds, 10) || 0);
   return htmlPage(
     '正在跳转...',
     `<div class="card" style="text-align: center; max-width: 500px;">
@@ -195,8 +196,9 @@ function redirectHtmlPage(url) {
       <div id="loadingState">
         <div class="spinner"></div>
         <h2 style="font-weight: 700; margin-bottom: 8px;">正在跳转...</h2>
-        <p style="font-size: 0.9rem; color: var(--text-secondary);">安全检查中，即将跳转到目标地址</p>
+        <p style="font-size: 0.9rem; color: var(--text-secondary);">将在 <span id="countdown" style="color: var(--accent-color); font-weight: 700;">${delay}</span> 秒后自动跳转到目标地址</p>
         <div class="url-text">${escapeHtml(url)}</div>
+        <button type="button" id="btnJumpNow" class="btn btn-secondary" style="width: auto; padding: 8px 24px; margin: 0 auto;">立即跳转</button>
       </div>
       <div id="errorState" class="hidden">
         <div style="font-size: 3rem; margin-bottom: 16px;">⚠️</div>
@@ -208,10 +210,27 @@ function redirectHtmlPage(url) {
           <a href="/" class="btn btn-secondary">返回首页</a>
         </div>
       </div>
+      <div style="margin-top: 18px;">
+        <a href="javascript:void(0)" id="btnReportToggle" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none;">🚩 举报此链接</a>
+      </div>
+      <div id="reportBox" style="display: none; text-align: left; margin-top: 12px; background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px;">
+        <select id="reportReason" style="width: 100%; padding: 8px 10px; margin-bottom: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 0.85rem;">
+          <option value="">请选择举报原因</option>
+          <option value="违法违规">违法违规</option>
+          <option value="欺诈钓鱼">欺诈钓鱼</option>
+          <option value="色情低俗">色情低俗</option>
+          <option value="侵权内容">侵权内容</option>
+          <option value="其他问题">其他问题</option>
+        </select>
+        <textarea id="reportNote" placeholder="补充说明（可选，200 字以内）" maxlength="200" style="width: 100%; min-height: 60px; padding: 8px 10px; margin-bottom: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 0.85rem; resize: vertical; font-family: var(--font-sans);"></textarea>
+        <button type="button" id="btnReportSubmit" class="btn btn-secondary" style="width: auto; padding: 7px 20px;">提交举报</button>
+      </div>
+      <p id="reportDone" style="display: none; color: var(--success-color); font-size: 0.85rem; margin-top: 12px; margin-bottom: 0;">✅ 举报已提交，感谢您的反馈，我们会尽快核实处理。</p>
     </div>
     <script>
       (function() {
         const targetUrl = ${JSON.stringify(url)};
+        const delaySeconds = ${JSON.stringify(delay)};
         let resolved = false;
         function doRedirect() {
           if (resolved) return;
@@ -224,21 +243,75 @@ function redirectHtmlPage(url) {
           document.getElementById('loadingState').classList.add('hidden');
           document.getElementById('errorState').classList.remove('hidden');
         }
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          showError();
-        }, 2500);
-        fetch(targetUrl, { mode: 'no-cors', signal: controller.signal })
-          .then(() => {
-            clearTimeout(timeoutId);
+        if (delaySeconds <= 0) {
+          doRedirect();
+          return;
+        }
+        // 倒计时结束后跳转（后台可配置停留秒数）
+        let remaining = delaySeconds;
+        const countdownEl = document.getElementById('countdown');
+        const timer = setInterval(() => {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(timer);
             doRedirect();
-          })
+            return;
+          }
+          countdownEl.textContent = remaining;
+        }, 1000);
+        document.getElementById('btnJumpNow').addEventListener('click', () => {
+          clearInterval(timer);
+          doRedirect();
+        });
+        // 可达性探测：确认失败（非超时）则停止倒计时并进入错误态
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+        fetch(targetUrl, { mode: 'no-cors', signal: controller.signal })
+          .then(() => clearTimeout(timeoutId))
           .catch((err) => {
             clearTimeout(timeoutId);
-            if (err.name === 'AbortError') return;
+            if (err.name === 'AbortError') return; // 目标响应慢，继续倒计时
+            clearInterval(timer);
             showError();
           });
+      })();
+
+      // 举报此链接
+      (function() {
+        const toggle = document.getElementById('btnReportToggle');
+        const box = document.getElementById('reportBox');
+        if (!toggle || !box) return;
+        toggle.addEventListener('click', () => {
+          box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        });
+        document.getElementById('btnReportSubmit').addEventListener('click', async function() {
+          const btn = this;
+          const reason = document.getElementById('reportReason').value;
+          const note = document.getElementById('reportNote').value.trim();
+          if (!reason && !note) {
+            showToast('请选择举报原因或填写补充说明');
+            return;
+          }
+          btn.disabled = true;
+          btn.textContent = '提交中...';
+          try {
+            const fullReason = [reason, note].filter(Boolean).join(' - ');
+            const resp = await fetch('/api/report', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: ${JSON.stringify(code)}, reason: fullReason })
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || '提交失败');
+            box.style.display = 'none';
+            toggle.style.display = 'none';
+            document.getElementById('reportDone').style.display = 'block';
+          } catch (err) {
+            showToast(err.message);
+            btn.disabled = false;
+            btn.textContent = '提交举报';
+          }
+        });
       })();
     </script>`,
     `
@@ -330,6 +403,11 @@ export default async function onRequest(context) {
 
   const kv = getKV(context);
 
+  // 后台惰性清理过期短链（不阻塞响应，内部自带 6 小时节流）
+  if (context.waitUntil) {
+    context.waitUntil(maybeCleanupExpiredLinks(kv));
+  }
+
   const unavailableHtml = htmlPage(
     '内容不可用',
     `<div class="card" style="text-align: center;">
@@ -381,6 +459,22 @@ export default async function onRequest(context) {
       }
     }
 
+    const settings = await getSiteSettings(kv);
+
+    // 非注册用户短链保留期（后台可配，0 = 永久保留）：超期访问即时失效并删除
+    if (settings.guestLinkRetentionDays > 0 && !linkData.owner && linkData.createdAt) {
+      if (Date.now() - new Date(linkData.createdAt).getTime() > settings.guestLinkRetentionDays * 86400000) {
+        await kv.delete(`link:${code}`);
+        return new Response(unavailableHtml, {
+          status: 404,
+          headers: {
+            'Content-Type': 'text/html; charset=UTF-8',
+            'Cache-Control': 'no-store'
+          }
+        });
+      }
+    }
+
     const clicks = linkData.clicks || 0;
     const viewLimit = linkData.viewLimit;
 
@@ -408,7 +502,7 @@ export default async function onRequest(context) {
     }
 
     if (!linkData.type || linkData.type === 'url') {
-      const redirectHtml = redirectHtmlPage(linkData.url);
+      const redirectHtml = redirectHtmlPage(linkData.url, settings.redirectDelaySeconds, code);
       return new Response(redirectHtml, {
         status: 200,
         headers: {

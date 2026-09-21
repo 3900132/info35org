@@ -220,7 +220,18 @@ async function getUserFromToken(kv, request) {
  * ---------------------------------------------------- */
 
 const SITE_SETTINGS_KEY = 'settings:site';
-const DEFAULT_SITE_SETTINGS = { requireRegister: false };
+const DEFAULT_SITE_SETTINGS = {
+  requireRegister: false,
+  guestLinkRetentionDays: 7,   // 非注册用户短链保留天数，0 = 永久保留
+  redirectDelaySeconds: 3      // 跳转中间页停留秒数，0 = 立即跳转
+};
+
+// 整数设置项解析：非法值回退默认值，并夹在 [min, max] 区间
+function clampIntSetting(value, min, max, fallback) {
+  const n = parseInt(value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
 
 async function getSiteSettings(kv) {
   const raw = await kv.get(SITE_SETTINGS_KEY);
@@ -230,7 +241,9 @@ async function getSiteSettings(kv) {
     return {
       requireRegister: !!(parsed && parsed.requireRegister),
       requireApproval: !!(parsed && parsed.requireApproval),
-      disableRegister: !!(parsed && parsed.disableRegister)
+      disableRegister: !!(parsed && parsed.disableRegister),
+      guestLinkRetentionDays: clampIntSetting(parsed && parsed.guestLinkRetentionDays, 0, 365, DEFAULT_SITE_SETTINGS.guestLinkRetentionDays),
+      redirectDelaySeconds: clampIntSetting(parsed && parsed.redirectDelaySeconds, 0, 60, DEFAULT_SITE_SETTINGS.redirectDelaySeconds)
     };
   } catch (e) {
     return { ...DEFAULT_SITE_SETTINGS };
@@ -242,6 +255,108 @@ async function saveSiteSettings(kv, patch) {
   const next = { ...current, ...patch };
   await kv.put(SITE_SETTINGS_KEY, JSON.stringify(next));
   return next;
+}
+
+/* ----------------------------------------------------
+ * EXPIRED LINK CLEANUP（惰性定期清理）
+ * ---------------------------------------------------- */
+
+const CLEANUP_MARKER_KEY = 'meta:lastCleanup';
+const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 每 6 小时最多执行一次全量扫描
+const CLEANUP_MAX_DELETIONS = 500;              // 单次运行最多删除数，超出部分留给下一轮
+
+// 判断单条短链是否应被清理：expiresAt 已过，或非注册用户短链超过保留期
+function isLinkExpired(link, guestCutoffMs) {
+  if (link.expiresAt && Date.now() > new Date(link.expiresAt).getTime()) return true;
+  if (!link.owner && link.createdAt && guestCutoffMs !== null) {
+    if (new Date(link.createdAt).getTime() < guestCutoffMs) return true;
+  }
+  return false;
+}
+
+// 惰性触发：由跳转/创建短链等高频路径在后台调用（waitUntil），
+// 通过 KV 时间戳标记节流；管理端手动清理传 { force: true } 跳过节流。
+// 返回值仅供日志/测试使用，从不抛错。
+async function maybeCleanupExpiredLinks(kv, opts = {}) {
+  try {
+    const now = Date.now();
+    if (!opts.force) {
+      const markerRaw = await kv.get(CLEANUP_MARKER_KEY);
+      if (markerRaw) {
+        try {
+          const marker = typeof markerRaw === 'string' ? JSON.parse(markerRaw) : markerRaw;
+          if (marker && marker.at && now - new Date(marker.at).getTime() < CLEANUP_INTERVAL_MS) {
+            return { skipped: true };
+          }
+        } catch (e) { /* 标记损坏则重新执行 */ }
+      }
+    }
+    // 先写标记再扫描，避免并发重复执行
+    await kv.put(CLEANUP_MARKER_KEY, JSON.stringify({ at: new Date(now).toISOString() }));
+
+    const settings = await getSiteSettings(kv);
+    const retentionDays = settings.guestLinkRetentionDays;
+    const guestCutoffMs = retentionDays > 0 ? now - retentionDays * 86400000 : null;
+
+    const keys = await listAllLinkKeys(kv);
+    let scanned = 0;
+    let deleted = 0;
+    for (const keyName of keys) {
+      if (deleted >= CLEANUP_MAX_DELETIONS) break;
+      const value = await kv.get(keyName);
+      if (!value) continue;
+      scanned++;
+      try {
+        const link = typeof value === 'string' ? JSON.parse(value) : value;
+        if (link && isLinkExpired(link, guestCutoffMs)) {
+          await kv.delete(keyName);
+          deleted++;
+        }
+      } catch (e) { /* 跳过损坏记录 */ }
+    }
+
+    // 顺带清理已失效的限流计数键（resetAt 过去超过 1 小时，后续请求会自动重建）
+    let ratelimitDeleted = 0;
+    let rlCursor = null;
+    do {
+      const res = await kv.list(rlCursor ? { prefix: 'ratelimit:', limit: 100, cursor: rlCursor } : { prefix: 'ratelimit:', limit: 100 });
+      for (const k of (res.keys || [])) {
+        const keyName = typeof k === 'string' ? k : (k?.name || k?.key);
+        if (!keyName) continue;
+        try {
+          const raw = await kv.get(keyName);
+          const record = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (record && record.resetAt && now - new Date(record.resetAt).getTime() > 3600000) {
+            await kv.delete(keyName);
+            ratelimitDeleted++;
+          }
+        } catch (e) { /* 跳过损坏记录 */ }
+      }
+      rlCursor = res.list_complete ? null : normalizeListCursor(res.cursor);
+    } while (rlCursor);
+
+    // 顺带清理过期历史统计（趋势图仅展示近 7 天，30 天前的每日点击统计不再有读取方）
+    let statsDeleted = 0;
+    const statsCutoff = new Date(now - 30 * 86400000).toISOString().split('T')[0];
+    let stCursor = null;
+    do {
+      const res = await kv.list(stCursor ? { prefix: 'stats:clicks:', limit: 100, cursor: stCursor } : { prefix: 'stats:clicks:', limit: 100 });
+      for (const k of (res.keys || [])) {
+        const keyName = typeof k === 'string' ? k : (k?.name || k?.key);
+        if (!keyName) continue;
+        const datePart = keyName.replace('stats:clicks:', '');
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart) && datePart < statsCutoff) {
+          await kv.delete(keyName);
+          statsDeleted++;
+        }
+      }
+      stCursor = res.list_complete ? null : normalizeListCursor(res.cursor);
+    } while (stCursor);
+
+    return { scanned, deleted, ratelimitDeleted, statsDeleted, truncated: deleted >= CLEANUP_MAX_DELETIONS };
+  } catch (e) {
+    return { error: e.message };
+  }
 }
 
 /* ----------------------------------------------------
@@ -280,7 +395,7 @@ async function listAllLinkKeys(kv) {
   return keys;
 }
 
-// export { getKV, corsHeaders, escapeHtml, verifyAdminAuth, checkRateLimit, randomHex, timingSafeEqual, hashPassword, createUserToken, getUserFromToken, getSiteSettings, saveSiteSettings, listAllLinkKeys, normalizeListCursor };
+// export { getKV, corsHeaders, escapeHtml, verifyAdminAuth, checkRateLimit, randomHex, timingSafeEqual, hashPassword, createUserToken, getUserFromToken, getSiteSettings, saveSiteSettings, listAllLinkKeys, normalizeListCursor, maybeCleanupExpiredLinks, isLinkExpired };
 function generateRandomCode(length = 6) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
@@ -445,6 +560,11 @@ export default async function onRequest(context) {
     };
 
     await kv.put(`link:${shortCode}`, JSON.stringify(linkData));
+
+    // 后台惰性清理过期短链（不阻塞响应，内部自带 6 小时节流）
+    if (context.waitUntil) {
+      context.waitUntil(maybeCleanupExpiredLinks(kv));
+    }
 
     if (expiresAt) {
       const trendDate = createdAt.split('T')[0];

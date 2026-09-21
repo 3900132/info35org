@@ -1,4 +1,4 @@
-import { getKV, corsHeaders, escapeHtml, checkRateLimit, getSiteSettings, getUserFromToken } from '../lib/kv-helpers.js';
+import { getKV, corsHeaders, escapeHtml, checkRateLimit, getSiteSettings, getUserFromToken, maybeCleanupExpiredLinks } from '../lib/kv-helpers.js';
 
 function generateRandomCode(length = 6) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -164,6 +164,11 @@ export default async function onRequest(context) {
     };
 
     await kv.put(`link:${shortCode}`, JSON.stringify(linkData));
+
+    // 后台惰性清理过期短链（不阻塞响应，内部自带 6 小时节流）
+    if (context.waitUntil) {
+      context.waitUntil(maybeCleanupExpiredLinks(kv));
+    }
 
     if (expiresAt) {
       const trendDate = createdAt.split('T')[0];

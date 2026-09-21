@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeLink - 举报反馈</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
+
+  <!-- Self-hosted Fonts (no Google Fonts dependency) -->
+  <link rel="preload" href="/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/fonts.css">
+
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-mode">
+  <div class="bg-glow"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">⚙️</span>
+        <h1 class="logo-text">Edge<span>Link Admin</span></h1>
+      </div>
+      <p class="tagline">用户举报反馈</p>
+    </header>
+
+    <!-- Content Area -->
+    <main class="app-content">
+
+      <div class="card glass">
+        <div class="card-header flex-header">
+          <div>
+            <h2>🚩 举报反馈</h2>
+            <p id="arSummary">正在加载举报数据...</p>
+          </div>
+          <div class="header-actions">
+            <a href="/admin" class="btn btn-secondary" style="text-decoration:none;">← 返回管理后台</a>
+            <button onclick="arReload()" class="btn btn-secondary">🔄 刷新</button>
+          </div>
+        </div>
+        <div class="pagination-bar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;">
+          <label style="font-size:0.9rem;color:var(--text-secondary);">每页显示
+            <input type="number" id="arPageSize" min="1" max="500" value="30" style="width:70px;margin:0 6px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);">
+            条
+          </label>
+          <button onclick="arChangePage(-1)" id="arBtnPrev" class="btn btn-secondary" style="width:auto;padding:6px 14px;">← 上一页</button>
+          <span id="arPageInfo" style="font-size:0.9rem;color:var(--text-secondary);">- / -</span>
+          <button onclick="arChangePage(1)" id="arBtnNext" class="btn btn-secondary" style="width:auto;padding:6px 14px;">下一页 →</button>
+        </div>
+      </div>
+
+      <div class="card glass">
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>短地址</th>
+                <th>目标链接/内容</th>
+                <th>举报原因</th>
+                <th>举报时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="arReportsList"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>© 2026 EdgeLink Admin | <a href="/admin" style="color:var(--accent-color);">返回管理后台</a></p>
+    </footer>
+  </div>
+
+  <!-- Toast Notifications Container -->
+  <div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:9999;"></div>
+
+  <script src="admin-reports.js" defer></script>
+</body>
+</html>

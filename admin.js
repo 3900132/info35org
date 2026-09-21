@@ -8,9 +8,6 @@ let activeAdminToken = '';
 let adminTokenExpiry = 0;
 const TOKEN_TTL = 30 * 60 * 1000;
 
-let adminCursor = null;
-let adminFilterQuery = '';
-
 document.addEventListener('DOMContentLoaded', () => {
   const stored = sessionStorage.getItem('edgelink_admin_token');
   const storedExpiry = sessionStorage.getItem('edgelink_admin_expiry');
@@ -41,15 +38,6 @@ function showToast(message, type = 'info', duration = 3500) {
   }, duration);
 }
 
-function copyText(text) {
-  const tempInput = document.createElement('textarea');
-  tempInput.value = text;
-  document.body.appendChild(tempInput);
-  tempInput.select();
-  try { document.execCommand('copy'); showToast('复制成功！', 'success'); } catch (e) { showToast('复制失败', 'error'); }
-  document.body.removeChild(tempInput);
-}
-
 /* ----------------------------------------------------
  * ADMIN CONTROLLER
  * ---------------------------------------------------- */
@@ -60,7 +48,7 @@ function handleAdminLogin(e) {
   attemptAdminLogin(token);
 }
 
-async function attemptAdminLogin(token) {
+async function attemptAdminLogin(token, silent = false) {
   const adminAuthCard = document.getElementById('adminAuthCard');
   const adminConsole = document.getElementById('adminConsole');
 
@@ -82,14 +70,12 @@ async function attemptAdminLogin(token) {
     adminConsole.classList.remove('hidden');
 
     adminLinks = result.links || [];
-    adminCursor = result.cursor || null;
     document.getElementById('statTotalLinks').textContent = result.total || adminLinks.length;
     updateTotalClicks();
-    renderAdminLinks();
     loadTrendChart();
     loadSiteSettings();
     loadAdminUsers();
-    showToast('管理员验证成功', 'success');
+    if (!silent) showToast('管理员验证成功', 'success');
 
   } catch (err) {
     showToast(err.message, 'error');
@@ -110,241 +96,9 @@ function handleAdminLogout() {
   showToast('已退出登录', 'info');
 }
 
-async function loadMoreLinks() {
-  if (!adminCursor || !activeAdminToken) return;
-  const btn = document.getElementById('btnLoadMore');
-  btn.disabled = true;
-  btn.textContent = '加载中...';
-
-  try {
-    const response = await fetch(`/api/admin/list?limit=50&cursor=${encodeURIComponent(adminCursor)}`, {
-      headers: { 'Authorization': `Bearer ${activeAdminToken}` }
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '加载失败');
-
-    const newLinks = result.links || [];
-    const existingCodes = new Set(adminLinks.map(l => l.code));
-    for (const link of newLinks) {
-      if (link && !existingCodes.has(link.code)) {
-        adminLinks.push(link);
-        existingCodes.add(link.code);
-      }
-    }
-
-    adminCursor = result.cursor || null;
-    document.getElementById('statTotalLinks').textContent = result.total || adminLinks.length;
-    updateTotalClicks();
-    renderAdminLinks(adminFilterQuery);
-
-    if (!adminCursor) {
-      document.getElementById('loadMoreContainer').classList.add('hidden');
-    }
-  } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '加载更多...';
-  }
-}
-
-async function fetchAdminLinks() {
-  if (!activeAdminToken) return;
-  const listBody = document.getElementById('adminLinksList');
-  listBody.innerHTML = '<tr class="empty-row"><td colspan="8">Refreshing KV data...</td></tr>';
-
-  try {
-    const response = await fetch('/api/admin/list?limit=50', {
-      headers: { 'Authorization': `Bearer ${activeAdminToken}` }
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Failed to fetch');
-    adminLinks = result.links || [];
-    adminCursor = result.cursor || null;
-    document.getElementById('statTotalLinks').textContent = result.total || adminLinks.length;
-    updateTotalClicks();
-    renderAdminLinks();
-    loadTrendChart();
-    document.getElementById('loadMoreContainer').classList.toggle('hidden', !adminCursor);
-    showToast('刷新成功', 'success');
-  } catch (err) {
-    showToast(err.message, 'error');
-    if (err.message.includes('Unauthorized') || err.message.includes('Token')) handleAdminLogout();
-  }
-}
-
 function updateTotalClicks() {
   const total = adminLinks.reduce((sum, item) => sum + (item.clicks || 0), 0);
   document.getElementById('statTotalClicks').textContent = total;
-}
-
-function toggleSelectAll(master) {
-  document.querySelectorAll('.link-checkbox').forEach(cb => { cb.checked = master.checked; });
-  updateSelectedCount();
-}
-
-function updateSelectedCount() {
-  const count = document.querySelectorAll('.link-checkbox:checked').length;
-  document.getElementById('selectedCount').textContent = count;
-  document.getElementById('btnBulkDelete').classList.toggle('hidden', count === 0);
-}
-
-async function handleBulkDelete() {
-  const checked = document.querySelectorAll('.link-checkbox:checked');
-  const codes = Array.from(checked).map(cb => cb.value);
-  if (codes.length === 0) return;
-  if (!confirm(`确定永久删除选中的 ${codes.length} 个链接？`)) return;
-
-  try {
-    const response = await fetch('/api/admin/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeAdminToken}` },
-      body: JSON.stringify({ codes })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Bulk delete failed');
-    showToast(`已删除 ${result.deleted.length} 个链接`, 'success');
-    adminLinks = adminLinks.filter(item => !result.deleted.includes(item.code));
-    renderAdminLinks(adminFilterQuery);
-    document.getElementById('statTotalLinks').textContent = adminLinks.length;
-    updateTotalClicks();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-}
-
-let activePreviewText = '';
-function previewTextNote(code) {
-  const item = adminLinks.find(link => link.code === code);
-  if (!item) return;
-  const previewModal = document.getElementById('previewModal');
-  activePreviewText = item.text || '';
-  document.getElementById('previewTextContent').textContent = activePreviewText;
-  const clicks = item.clicks || 0;
-  const limit = item.viewLimit;
-  const isDestroyed = limit && (clicks >= limit);
-  const badge = document.getElementById('previewBadge');
-  if (limit) {
-    badge.textContent = isDestroyed
-      ? `Destroyed/Expired (limit: ${clicks}/${limit})`
-      : `Burn-after-reading (remaining: ${limit - clicks}, total: ${limit})`;
-    badge.style.background = isDestroyed ? 'rgba(255, 69, 58, 0.1)' : 'rgba(190, 100, 50, 0.08)';
-    badge.style.color = isDestroyed ? 'var(--danger-color)' : 'var(--accent-color)';
-    badge.style.borderColor = isDestroyed ? 'rgba(255, 69, 58, 0.2)' : 'rgba(190, 100, 50, 0.2)';
-  } else {
-    badge.textContent = `Text Share (views: ${clicks} / Unlimited)`;
-    badge.style.background = 'rgba(50, 215, 75, 0.1)';
-    badge.style.color = 'var(--success-color)';
-    badge.style.borderColor = 'rgba(50, 215, 75, 0.2)';
-  }
-  previewModal.classList.remove('hidden');
-}
-
-function closePreviewModal() {
-  document.getElementById('previewModal').classList.add('hidden');
-  activePreviewText = '';
-}
-
-function copyPreviewText() {
-  if (!activePreviewText) return;
-  copyText(activePreviewText);
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
-
-function renderAdminLinks(filterQuery = '') {
-  adminFilterQuery = filterQuery;
-  const listBody = document.getElementById('adminLinksList');
-  let filtered = adminLinks;
-  if (filterQuery) {
-    const q = filterQuery.toLowerCase();
-    filtered = adminLinks.filter(item =>
-      item.code.toLowerCase().includes(q) ||
-      (item.url && item.url.toLowerCase().includes(q)) ||
-      (item.text && item.text.toLowerCase().includes(q))
-    );
-  }
-  document.getElementById('selectAll').checked = false;
-  updateSelectedCount();
-  if (filtered.length === 0) {
-    listBody.innerHTML = `<tr class="empty-row"><td colspan="8">${filterQuery ? 'No matches' : 'No links in KV'}</td></tr>`;
-    document.getElementById('loadMoreContainer').classList.toggle('hidden', !adminCursor);
-    return;
-  }
-  // 分页显示：只渲染前 linksPageSize 条，可在卡片右上角调整每页数量
-  const shown = filtered.slice(0, linksPageSize);
-  listBody.innerHTML = '';
-  shown.forEach(item => {
-    const row = document.createElement('tr');
-    const origin = window.location.origin;
-    const shortUrl = `${origin}/${item.code}`;
-    let dateStr = 'Unknown';
-    if (item.createdAt) {
-      const d = new Date(item.createdAt);
-      dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    const typeLabel = item.type === 'text'
-      ? '<span style="background: rgba(190,100,50,0.08);color:var(--accent-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(190,100,50,0.2);font-weight:600;">Text</span>'
-      : '<span style="background: rgba(145,80,46,0.08);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(145,80,46,0.2);font-weight:600;">Link</span>';
-    const displayContent = item.type === 'text'
-      ? `<span class="admin-note-preview" style="color:var(--text-secondary);font-style:italic;font-family:var(--font-mono);font-size:0.85rem;cursor:pointer;" onclick="previewTextNote('${item.code}')" title="Click to preview">${escapeHtml((item.text || '').length > 40 ? item.text.substring(0,40)+'...' : item.text)}</span>`
-      : `<a href="${item.url}" target="_blank" class="link-url">${item.url}</a>`;
-    const clicks = item.clicks || 0;
-    const viewLimit = item.viewLimit;
-    const isDestroyed = viewLimit && (clicks >= viewLimit);
-    let statusLabel = isDestroyed
-      ? '<span style="background:rgba(255,69,58,0.1);color:var(--danger-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(255,69,58,0.2);font-weight:600;">Destroyed</span>'
-      : clicks > 0
-        ? '<span style="background:rgba(50,215,75,0.1);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(50,215,75,0.2);font-weight:600;">Viewed</span>'
-        : '<span style="background:rgba(255,255,255,0.05);color:var(--text-muted);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid var(--border-color);font-weight:600;">Unviewed</span>';
-    const limitLabel = viewLimit
-      ? `<span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);font-weight:600;">${clicks} / ${viewLimit}</span>`
-      : `<span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);font-weight:600;">${clicks} / Unlimited</span>`;
-    row.innerHTML = `
-      <td style="text-align:center;"><input type="checkbox" class="link-checkbox" value="${item.code}" onchange="updateSelectedCount()" style="cursor:pointer;"></td>
-      <td><a href="${shortUrl}" target="_blank" class="link-code">/${item.code}</a></td>
-      <td>${typeLabel}</td>
-      <td title="${item.url || '点击查看'}">${displayContent}</td>
-      <td>${statusLabel} <span class="clicks-badge" style="padding:1px 6px;font-size:0.75rem;">${clicks}x</span></td>
-      <td>${limitLabel}</td>
-      <td><span class="date-text">${dateStr}</span></td>
-      <td>
-        <div class="row-actions">
-          ${item.type === 'text' ? `<button onclick="previewTextNote('${item.code}')" class="btn btn-secondary btn-small" title="预览">查看</button>` : ''}
-          <button onclick="copyText('${shortUrl}')" class="btn btn-secondary btn-small">复制</button>
-          <button onclick="showQRCode('${shortUrl}','${item.code}')" class="btn btn-secondary btn-small">二维码</button>
-          <button onclick="deleteLink('${item.code}')" class="btn btn-danger btn-small">删除</button>
-        </div>
-      </td>`;
-    listBody.appendChild(row);
-  });
-  document.getElementById('loadMoreContainer').classList.toggle('hidden', !adminCursor);
-}
-
-function filterAdminLinks() {
-  adminFilterQuery = document.getElementById('adminSearchInput').value.trim();
-  renderAdminLinks(adminFilterQuery);
-}
-
-async function deleteLink(code) {
-  if (!confirm(`确定永久删除 /${code}？`)) return;
-  try {
-    const response = await fetch('/api/admin/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeAdminToken}` },
-      body: JSON.stringify({ code })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || '删除失败');
-    showToast(`/${code} 已删除`, 'success');
-    adminLinks = adminLinks.filter(item => item.code !== code);
-    renderAdminLinks(adminFilterQuery);
-    document.getElementById('statTotalLinks').textContent = adminLinks.length;
-    updateTotalClicks();
-  } catch (err) { showToast(err.message, 'error'); }
 }
 
 /* ----------------------------------------------------
@@ -355,6 +109,8 @@ async function loadSiteSettings() {
   const toggle = document.getElementById('requireRegisterToggle');
   const approvalToggle = document.getElementById('requireApprovalToggle');
   const disableToggle = document.getElementById('disableRegisterToggle');
+  const retentionInput = document.getElementById('guestRetentionDaysInput');
+  const delayInput = document.getElementById('redirectDelayInput');
   if (!toggle || !activeAdminToken) return;
   try {
     const resp = await fetch('/api/admin/settings', {
@@ -365,8 +121,44 @@ async function loadSiteSettings() {
       toggle.checked = !!data.requireRegister;
       if (approvalToggle) approvalToggle.checked = !!data.requireApproval;
       if (disableToggle) disableToggle.checked = !!data.disableRegister;
+      if (retentionInput) retentionInput.value = data.guestLinkRetentionDays;
+      if (delayInput) delayInput.value = data.redirectDelaySeconds;
     }
   } catch (e) { /* ignore */ }
+}
+
+async function handleStorageSettingsSave(btn) {
+  const retentionInput = document.getElementById('guestRetentionDaysInput');
+  const delayInput = document.getElementById('redirectDelayInput');
+  const retention = parseInt(retentionInput.value, 10);
+  const delay = parseInt(delayInput.value, 10);
+  if (!Number.isFinite(retention) || retention < 0 || retention > 365) {
+    showToast('保留天数需为 0-365 的整数（0 表示永久保留）', 'error');
+    return;
+  }
+  if (!Number.isFinite(delay) || delay < 0 || delay > 60) {
+    showToast('跳转停留时间需为 0-60 的整数（0 表示立即跳转）', 'error');
+    return;
+  }
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = '保存中...';
+  try {
+    const resp = await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeAdminToken}` },
+      body: JSON.stringify({ guestLinkRetentionDays: retention, redirectDelaySeconds: delay })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '保存失败');
+    showToast(data.message || '设置已保存', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+    loadSiteSettings(); // 失败时回显服务端当前值
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
 }
 
 async function saveAdminSetting(key, value, checkbox) {
@@ -409,9 +201,13 @@ function escapeHtmlAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
 let allUsers = [];
 let usersPageSize = 30;
-let linksPageSize = 30;
 
 // 后台页签切换
 function switchAdminTab(tab) {
@@ -421,12 +217,6 @@ function switchAdminTab(tab) {
   document.getElementById('tabBtnLinks').className = isLinks ? 'btn btn-primary' : 'btn btn-secondary';
   document.getElementById('tabBtnUsers').className = isLinks ? 'btn btn-secondary' : 'btn btn-primary';
   if (!isLinks) loadAdminUsers();
-}
-
-function applyLinksPageSize() {
-  const v = parseInt(document.getElementById('linksPageSize').value, 10);
-  linksPageSize = (isNaN(v) || v < 10) ? 30 : Math.min(v, 500);
-  renderAdminLinks(adminFilterQuery);
 }
 
 function applyUsersPageSize() {
@@ -601,84 +391,28 @@ async function deleteAdminUser(username) {
 }
 
 /* ----------------------------------------------------
- * QR CODE DIALOG
+ * MANUAL KV CLEANUP（手动清理无用数据）
  * ---------------------------------------------------- */
 
-async function showQRCode(shortUrl, code) {
-  const container = document.getElementById('qrcodeContainer');
-  const qrUrlText = document.getElementById('qrUrlText');
-  const btnDownloadQR = document.getElementById('btnDownloadQR');
-  container.innerHTML = '';
-  qrUrlText.textContent = shortUrl;
-  document.getElementById('qrModal').classList.remove('hidden');
-  if (typeof QRCode !== 'undefined') {
-    new QRCode(container, {
-      text: shortUrl, width: 220, height: 220,
-      colorDark: '#0f141e', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.H
+async function handleManualCleanup(btn) {
+  if (!confirm('立即清理 KV 中的无用数据？\n（过期短链、超保留期的访客短链、失效的限流记录）')) return;
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = '清理中...';
+  try {
+    const resp = await fetch('/api/admin/cleanup', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${activeAdminToken}` }
     });
-    btnDownloadQR.onclick = () => {
-      const canvas = container.querySelector('canvas');
-      const img = container.querySelector('img');
-      const link = document.createElement('a');
-      link.download = `edgelink-${code}-qr.png`;
-      if (canvas) { link.href = canvas.toDataURL('image/png'); link.click(); showToast('二维码已下载', 'success'); }
-      else if (img && img.src && img.src.startsWith('data:')) { link.href = img.src; link.click(); showToast('二维码已下载', 'success'); }
-      else showToast('二维码不可用', 'error');
-    };
-  } else {
-    container.innerHTML = '<span style="color:red">二维码库加载失败</span>';
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '清理失败');
+    showToast(data.message || '清理完成', 'success');
+    // 数据可能变化，静默刷新仪表盘统计（不重复弹验证提示）
+    attemptAdminLogin(activeAdminToken, true);
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
   }
-}
-
-function closeQRModal() {
-  document.getElementById('qrModal').classList.add('hidden');
-}
-
-/* ----------------------------------------------------
- * CSV EXPORT
- * ---------------------------------------------------- */
-
-function exportCSV() {
-  if (!adminLinks || adminLinks.length === 0) {
-    showToast('没有可导出的数据', 'warning');
-    return;
-  }
-
-  const BOM = '\uFEFF';
-  const headers = ['短地址', '类型', '原始链接', '点击数', '查看限制', '过期时间', '创建时间'];
-  const rows = adminLinks.map(item => {
-    const type = item.type === 'text' ? '文字' : '链接';
-    const content = item.type === 'text' ? (item.text || '') : (item.url || '');
-    const limit = item.viewLimit || '无限制';
-    const expires = item.expiresAt || '永不过期';
-    let created = '';
-    if (item.createdAt) {
-      const d = new Date(item.createdAt);
-      created = d.toLocaleString('zh-CN');
-    }
-    return [
-      item.code,
-      type,
-      content,
-      item.clicks || 0,
-      limit,
-      expires,
-      created
-    ];
-  });
-
-  const csvContent = BOM + [headers, ...rows]
-    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  const dateStr = new Date().toISOString().slice(0, 10);
-  link.download = `edgelink-export-${dateStr}.csv`;
-  link.href = url;
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast(`已导出 ${adminLinks.length} 条记录`, 'success');
 }

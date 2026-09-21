@@ -194,6 +194,30 @@ app.get('/admin-user.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin-user.js'));
 });
 
+app.get('/admin-links', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-links.html'));
+});
+
+app.get('/admin-links.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-links.html'));
+});
+
+app.get('/admin-links.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-links.js'));
+});
+
+app.get('/admin-reports', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-reports.html'));
+});
+
+app.get('/admin-reports.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-reports.html'));
+});
+
+app.get('/admin-reports.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-reports.js'));
+});
+
 app.get('/admin.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.js'));
 });
@@ -237,7 +261,12 @@ const edgeRoutes = [
   { method: 'post',   path: '/api/admin/user-status',     file: './edge-functions/api/admin/user-status.js' },
   { method: 'get',    path: '/api/admin/user-links',      file: './edge-functions/api/admin/user-links.js' },
   { method: 'delete', path: '/api/admin/user-delete',     file: './edge-functions/api/admin/user-delete.js' },
-  { method: 'post',   path: '/api/admin/user-delete',     file: './edge-functions/api/admin/user-delete.js' }
+  { method: 'post',   path: '/api/admin/user-delete',     file: './edge-functions/api/admin/user-delete.js' },
+  { method: 'post',   path: '/api/report',                file: './edge-functions/api/report.js' },
+  { method: 'get',    path: '/api/admin/reports',         file: './edge-functions/api/admin/reports.js' },
+  { method: 'post',   path: '/api/admin/report-delete',   file: './edge-functions/api/admin/report-delete.js' },
+  { method: 'delete', path: '/api/admin/report-delete',   file: './edge-functions/api/admin/report-delete.js' },
+  { method: 'post',   path: '/api/admin/cleanup',         file: './edge-functions/api/admin/cleanup.js' }
 ];
 
 for (const route of edgeRoutes) {
