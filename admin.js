@@ -449,7 +449,7 @@ async function setUserStatus(username, status) {
   const actionText = { active: '通过审核/解封', pending: '标记为待审核', blocked: '封禁' }[status];
   if (!confirm(`确定将 ${username} ${actionText}？`)) return;
   try {
-    const resp = await fetch('/api/admin/users/status', {
+    const resp = await fetch('/api/admin/user-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeAdminToken}` },
       body: JSON.stringify({ username, status })
@@ -514,7 +514,7 @@ function renderAdminUsers() {
 
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td><a href="javascript:void(0)" onclick="showUserLinks('${escapeHtmlAttr(u.username)}')" class="link-code" title="点击查看该用户的短链明细">📧 ${escapeHtml(u.username)}</a></td>
+      <td><a href="/admin-user?username=${encodeURIComponent(u.username)}" class="link-code" title="点击查看该用户的短链明细">📧 ${escapeHtml(u.username)}</a></td>
       <td>${userStatusBadge(status)}</td>
       <td><span class="date-text">${created}</span></td>
       <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${u.linkCount || 0} 条</span></td>
@@ -579,64 +579,14 @@ async function loadTrendChart() {
 }
 
 /* ----------------------------------------------------
- * USER LINKS DRILL-DOWN MODAL
+ * USER LINKS DRILL-DOWN（独立页 /admin-user?username=xxx）
+ * 弹窗方案依赖的边缘函数嵌套路由在线上不可靠，已改为独立页面
  * ---------------------------------------------------- */
-
-// Drill-down: list all links created by a specific user
-async function showUserLinks(username) {
-  const modal = document.getElementById('userLinksModal');
-  document.getElementById('userLinksTitle').textContent = username;
-  document.getElementById('userLinksSummary').textContent = '加载中...';
-  document.getElementById('userLinksList').innerHTML = '';
-  modal.classList.remove('hidden');
-
-  try {
-    const resp = await fetch(`/api/admin/users/links?username=${encodeURIComponent(username)}`, {
-      headers: { 'Authorization': `Bearer ${activeAdminToken}` }
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || '加载失败');
-
-    document.getElementById('userLinksSummary').textContent =
-      `共 ${data.total || 0} 条短链，累计点击 ${data.totalClicks || 0} 次。`;
-
-    const listBody = document.getElementById('userLinksList');
-    if (!data.links || data.links.length === 0) {
-      listBody.innerHTML = '<tr class="empty-row"><td colspan="5">该用户尚未生成任何短链。</td></tr>';
-      return;
-    }
-
-    listBody.innerHTML = '';
-    for (const item of data.links) {
-      const shortUrl = `${window.location.origin}/${item.code}`;
-      const typeLabel = item.type === 'text' ? '📝 文字' : '🔗 链接';
-      const content = item.type === 'text'
-        ? `<span style="color: var(--text-secondary); font-style: italic;">${escapeHtml((item.text || '').substring(0, 60))}</span>`
-        : `<a href="${escapeHtml(item.url)}" target="_blank" class="link-url">${escapeHtml(item.url)}</a>`;
-      const created = item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN') : '未知';
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td><a href="${shortUrl}" target="_blank" class="link-code">/${escapeHtml(item.code)}</a></td>
-        <td>${typeLabel}</td>
-        <td title="${escapeHtml(item.url || item.text || '')}">${content}</td>
-        <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${item.clicks || 0} 次点击</span></td>
-        <td><span class="date-text">${created}</span></td>
-      `;
-      listBody.appendChild(row);
-    }
-  } catch (err) {
-    document.getElementById('userLinksSummary').textContent = `加载失败：${err.message}`;
-  }
-}
-
-function closeUserLinksModal() {
-  document.getElementById('userLinksModal').classList.add('hidden');
-}
 
 async function deleteAdminUser(username) {
   if (!confirm(`确定删除用户 "${username}"？其短链将保留但不再归属任何账户。`)) return;
   try {
-    const resp = await fetch('/api/admin/users/delete', {
+    const resp = await fetch('/api/admin/user-delete', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${activeAdminToken}` },
       body: JSON.stringify({ username })

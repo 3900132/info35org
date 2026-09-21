@@ -7,6 +7,14 @@
     {
       "source": "/admin",
       "destination": "/admin.html"
+    },
+    {
+      "source": "/user-center",
+      "destination": "/user-center.html"
+    },
+    {
+      "source": "/admin-user",
+      "destination": "/admin-user.html"
     }
   ]
 }

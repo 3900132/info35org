@@ -149,7 +149,7 @@
                   <input type="text" id="authCode" placeholder="6 位验证码" maxlength="6" inputmode="numeric" style="flex:1 1 0;min-width:0;">
                   <button type="button" id="btnSendCode" onclick="sendVerificationCode()" class="btn btn-secondary" style="width:auto;flex:0 0 auto;white-space:nowrap;padding:10px 14px;">发送验证码</button>
                 </div>
-                <small class="helper-text">验证码发送到您的邮箱，10 分钟内有效。</small>
+                <small class="helper-text">验证码发送到您的邮箱，5 分钟内有效。</small>
               </div>
               <div class="form-group">
                 <label for="authPassword">密码 <span class="required">*</span></label>
@@ -165,11 +165,11 @@
           <div id="authLoggedIn" class="hidden">
             <div class="card-header flex-header">
               <div>
-                <h2>👋 欢迎回来，<span id="authDisplayName"></span></h2>
+                <h2>👋 欢迎回来，<a href="/user-center" style="color:var(--accent-color);text-decoration:none;" title="进入用户中心"><span id="authDisplayName"></span></a></h2>
                 <p>您生成的短链已归属到当前账户，并计入点击统计。</p>
               </div>
               <div class="header-actions">
-                <button onclick="toggleMyLinks()" id="btnToggleMyLinks" class="btn btn-secondary">📋 我的短链</button>
+                <button onclick="location.href='/user-center'" id="btnToggleMyLinks" class="btn btn-secondary">📋 我的短链</button>
                 <button onclick="handleLogout()" class="btn btn-danger">退出登录</button>
               </div>
             </div>

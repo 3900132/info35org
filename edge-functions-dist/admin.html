@@ -260,37 +260,6 @@
       </div>
     </div>
 
-    <!-- User Links Drill-down Modal -->
-    <div id="userLinksModal" class="modal hidden">
-      <div class="modal-overlay" onclick="closeUserLinksModal()"></div>
-      <div class="modal-content glass" style="max-width: 900px; text-align: left;">
-        <div class="modal-header">
-          <h3>用户短链明细：<span id="userLinksTitle"></span></h3>
-          <button class="close-btn" onclick="closeUserLinksModal()">&times;</button>
-        </div>
-        <div class="modal-body" style="align-items: stretch;">
-          <p id="userLinksSummary" style="margin-bottom: 12px; color: var(--text-secondary); font-size: 0.9rem;"></p>
-          <div class="table-container" style="max-height: 420px; overflow-y: auto;">
-            <table>
-              <thead>
-                <tr>
-                  <th>短地址</th>
-                  <th>类型</th>
-                  <th>原始链接/内容</th>
-                  <th>点击统计</th>
-                  <th>创建时间</th>
-                </tr>
-              </thead>
-              <tbody id="userLinksList"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button onclick="closeUserLinksModal()" class="btn btn-primary">关闭</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Toast Notifications Container -->
     <div id="toastContainer" class="toast-container"></div>
 

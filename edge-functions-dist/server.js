@@ -170,6 +170,30 @@ app.get('/admin.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
+app.get('/user-center', (req, res) => {
+  res.sendFile(path.join(__dirname, 'user-center.html'));
+});
+
+app.get('/user-center.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'user-center.html'));
+});
+
+app.get('/user-center.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'user-center.js'));
+});
+
+app.get('/admin-user', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-user.html'));
+});
+
+app.get('/admin-user.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-user.html'));
+});
+
+app.get('/admin-user.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-user.js'));
+});
+
 app.get('/admin.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'admin.js'));
 });
@@ -210,10 +234,10 @@ const edgeRoutes = [
   { method: 'get',    path: '/api/auth/me',               file: './edge-functions/api/auth/me.js' },
   { method: 'get',    path: '/api/my/links',              file: './edge-functions/api/my/links.js' },
   { method: 'get',    path: '/api/admin/users',           file: './edge-functions/api/admin/users.js' },
-  { method: 'post',   path: '/api/admin/users/status',    file: './edge-functions/api/admin/users/status.js' },
-  { method: 'get',    path: '/api/admin/users/links',     file: './edge-functions/api/admin/users/links.js' },
-  { method: 'delete', path: '/api/admin/users/delete',    file: './edge-functions/api/admin/users/delete.js' },
-  { method: 'post',   path: '/api/admin/users/delete',    file: './edge-functions/api/admin/users/delete.js' }
+  { method: 'post',   path: '/api/admin/user-status',     file: './edge-functions/api/admin/user-status.js' },
+  { method: 'get',    path: '/api/admin/user-links',      file: './edge-functions/api/admin/user-links.js' },
+  { method: 'delete', path: '/api/admin/user-delete',     file: './edge-functions/api/admin/user-delete.js' },
+  { method: 'post',   path: '/api/admin/user-delete',     file: './edge-functions/api/admin/user-delete.js' }
 ];
 
 for (const route of edgeRoutes) {

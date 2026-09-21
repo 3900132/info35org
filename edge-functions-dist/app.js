@@ -194,9 +194,8 @@ async function handleAuthSubmit(e) {
     authUsername = data.email || data.username || email;
     localStorage.setItem('edgelink_token', authToken);
     localStorage.setItem('edgelink_username', authUsername);
-    setLoggedInView(true);
-    loadMyLinks();
-    showToast(data.message || '登录成功', 'success');
+    // 登录/注册成功后跳转到用户中心页
+    window.location.href = '/user-center';
   } catch (err) {
     showToast(err.message, 'error');
   } finally {

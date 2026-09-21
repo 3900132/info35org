@@ -12,10 +12,10 @@ import { getKV, corsHeaders, checkRateLimit } from '../../lib/kv-helpers.js';
 //      注意：公网端点按官方文档映射（https://help.aliyun.com/zh/direct-mail/api-dm-2015-11-23-endpoint），
 //      cn-hangzhou 为 dm.aliyuncs.com（无区域前缀），其余区域为 dm.<region>.aliyuncs.com。
 //      误用 dm.cn-hangzhou.aliyuncs.com（不存在的域名）会因无法解析被网关拦截，表现为 504。
-// 验证码有效期 10 分钟，60 秒内同邮箱只能发一次。
+// 验证码有效期 5 分钟，60 秒内同邮箱只能发一次。
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_TTL_MS = 5 * 60 * 1000;
 
 // 阿里云 RPC 签名所需的百分号编码。
 // 阿里云规范化规则：仅 A-Z a-z 0-9 - _ . ~ 不编码，其余一律转义为 %XY。
@@ -88,13 +88,13 @@ async function buildAliyunDirectMailRequest(provider, to, subject, text, html) {
 
 function buildMail(provider, from, to, code) {
   const subject = 'EdgeLink 注册验证码';
-  const text = `您的 EdgeLink 注册验证码是：${code}。10 分钟内有效，请勿泄露给他人。如非本人操作请忽略本邮件。`;
+  const text = `您的 EdgeLink 注册验证码是：${code}。5 分钟内有效，请勿泄露给他人。如非本人操作请忽略本邮件。`;
   const html = `
     <div style="max-width:480px;margin:0 auto;font-family:-apple-system,'Segoe UI',Roboto,'Microsoft YaHei',sans-serif;padding:32px;background:#0d111a;border-radius:16px;color:#f0f3f8;">
       <h2 style="margin:0 0 8px;font-size:20px;">⚡ EdgeLink 注册验证码</h2>
       <p style="color:#9aa3b2;font-size:14px;margin:0 0 24px;">您正在注册 EdgeLink 账号，请使用以下验证码完成注册：</p>
       <div style="font-size:34px;font-weight:800;letter-spacing:8px;font-family:monospace;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;text-align:center;color:#4cc9f0;">${code}</div>
-      <p style="color:#9aa3b2;font-size:12px;margin:24px 0 0;">验证码 10 分钟内有效。如非本人操作，请忽略本邮件。</p>
+      <p style="color:#9aa3b2;font-size:12px;margin:24px 0 0;">验证码 5 分钟内有效。如非本人操作，请忽略本邮件。</p>
     </div>`;
 
   if (provider === 'resend') {
@@ -222,8 +222,8 @@ export default async function onRequest(context) {
     await kv.put(`vcode:${email}`, JSON.stringify({ code, expiresAt, attempts: 0 }));
 
     const subject = 'EdgeLink 注册验证码';
-    const text = `您的 EdgeLink 注册验证码是：${code}。10 分钟内有效，请勿泄露给他人。如非本人操作请忽略本邮件。`;
-    const html = `<div style="max-width:480px;margin:0 auto;font-family:'Microsoft YaHei',sans-serif;padding:28px;background:#0d111a;border-radius:14px;color:#f0f3f8;"><h2 style="margin:0 0 8px;font-size:20px;">⚡ EdgeLink 注册验证码</h2><p style="color:#9aa3b2;font-size:14px;margin:0 0 20px;">您正在注册 EdgeLink 账号，请使用以下验证码完成注册：</p><div style="font-size:32px;font-weight:800;letter-spacing:8px;font-family:monospace;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:16px;text-align:center;color:#4cc9f0;">${code}</div><p style="color:#9aa3b2;font-size:12px;margin:20px 0 0;">验证码 10 分钟内有效，请勿泄露。如非本人操作，请忽略本邮件。</p></div>`;
+    const text = `您的 EdgeLink 注册验证码是：${code}。5 分钟内有效，请勿泄露给他人。如非本人操作请忽略本邮件。`;
+    const html = `<div style="max-width:480px;margin:0 auto;font-family:'Microsoft YaHei',sans-serif;padding:28px;background:#0d111a;border-radius:14px;color:#f0f3f8;"><h2 style="margin:0 0 8px;font-size:20px;">⚡ EdgeLink 注册验证码</h2><p style="color:#9aa3b2;font-size:14px;margin:0 0 20px;">您正在注册 EdgeLink 账号，请使用以下验证码完成注册：</p><div style="font-size:32px;font-weight:800;letter-spacing:8px;font-family:monospace;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:16px;text-align:center;color:#4cc9f0;">${code}</div><p style="color:#9aa3b2;font-size:12px;margin:20px 0 0;">验证码 5 分钟内有效，请勿泄露。如非本人操作，请忽略本邮件。</p></div>`;
 
     let resp;
     if (provider.name === 'aliyun') {
@@ -260,7 +260,7 @@ export default async function onRequest(context) {
 
     return new Response(JSON.stringify({
       success: true,
-      message: `验证码已发送至 ${email}，10 分钟内有效，请查收（注意检查垃圾邮件）。`
+      message: `验证码已发送至 ${email}，5 分钟内有效，请查收（注意检查垃圾邮件）。`
     }), { status: 200, headers: corsHeaders() });
 
   } catch (err) {

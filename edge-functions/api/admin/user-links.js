@@ -1,7 +1,7 @@
-import { getKV, corsHeaders, verifyAdminAuth, listAllLinkKeys } from '../../../lib/kv-helpers.js';
+import { getKV, corsHeaders, verifyAdminAuth, listAllLinkKeys } from '../../lib/kv-helpers.js';
 
 // Admin drill-down: lists all links created by a given user, with click stats.
-// GET /api/admin/users/links?username=xxx
+// GET /api/admin/user-links?username=xxx
 export default async function onRequest(context) {
   const { request } = context;
 

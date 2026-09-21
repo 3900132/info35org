@@ -1,7 +1,7 @@
-import { getKV, corsHeaders, verifyAdminAuth } from '../../../lib/kv-helpers.js';
+import { getKV, corsHeaders, verifyAdminAuth } from '../../lib/kv-helpers.js';
 
 // 用户审核/状态管理（防恶意注册）。
-// POST /api/admin/users/status
+// POST /api/admin/user-status
 // body: { usernames: [...] 或 username, status: 'active' | 'pending' | 'blocked' }
 //   active  = 审核通过 / 解封
 //   pending = 重新标记待审核

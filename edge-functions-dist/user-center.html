@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EdgeLink - 用户中心</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👤</text></svg>">
+
+  <!-- Self-hosted Fonts (no Google Fonts dependency) -->
+  <link rel="preload" href="/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/fonts.css">
+
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-mode">
+  <div class="bg-glow"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="logo-icon">⚡</span>
+        <h1 class="logo-text">Edge<span>Link</span></h1>
+      </div>
+      <p class="tagline">用户中心 - 我的短链管理</p>
+    </header>
+
+    <!-- Content Area -->
+    <main class="app-content">
+
+      <!-- Not logged in -->
+      <div id="notLoggedIn" class="card glass hidden">
+        <div class="card-header">
+          <h2>尚未登录</h2>
+          <p>请先返回首页登录后再查看您的短链。</p>
+        </div>
+        <a href="/" class="btn btn-primary" style="width:100%;text-decoration:none;">返回首页登录</a>
+      </div>
+
+      <!-- Logged in -->
+      <div id="userCenterMain" class="hidden">
+        <!-- Account Card -->
+        <div class="card glass">
+          <div class="card-header flex-header">
+            <div>
+              <h2>👋 欢迎回来，<span id="ucDisplayName"></span></h2>
+              <p id="ucSummary">正在加载您的短链数据...</p>
+            </div>
+            <div class="header-actions">
+              <a href="/" class="btn btn-secondary" style="text-decoration:none;">⚡ 生成短链</a>
+              <button onclick="ucLogout()" class="btn btn-danger">退出登录</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Links Card -->
+        <div class="card glass">
+          <div class="card-header">
+            <h2>📋 我的短链</h2>
+            <div class="pagination-bar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;">
+              <label style="font-size:0.9rem;color:var(--text-secondary);">每页显示
+                <input type="number" id="ucPageSize" min="1" max="500" value="30" style="width:70px;margin:0 6px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);">
+                条
+              </label>
+              <button onclick="ucChangePage(-1)" id="ucBtnPrev" class="btn btn-secondary" style="width:auto;padding:6px 14px;">← 上一页</button>
+              <span id="ucPageInfo" style="font-size:0.9rem;color:var(--text-secondary);">- / -</span>
+              <button onclick="ucChangePage(1)" id="ucBtnNext" class="btn btn-secondary" style="width:auto;padding:6px 14px;">下一页 →</button>
+              <button onclick="ucReload()" class="btn btn-secondary" style="width:auto;padding:6px 14px;">🔄 刷新</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>短地址</th>
+                  <th>类型</th>
+                  <th>原始链接/内容</th>
+                  <th>点击统计</th>
+                  <th>创建时间</th>
+                </tr>
+              </thead>
+              <tbody id="ucLinksList"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>© 2026 EdgeLink | <a href="/" style="color:var(--accent-color);">返回首页</a></p>
+    </footer>
+  </div>
+
+  <!-- Toast Notifications Container -->
+  <div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:9999;"></div>
+
+  <script src="user-center.js" defer></script>
+</body>
+</html>
