@@ -52,9 +52,9 @@ async function initAuth() {
   setLoggedInView(false);
 
   // 初始化页签状态；仅在用户尚未手动选择时自动切换
-  // （开启注册限制时自动切到注册页签，含验证码输入框）
+  // （开启注册限制时自动切到注册页签，含验证码输入框；总闸关闭注册时保持登录页签）
   if (!authTabUserSelected) {
-    switchAuthTab(siteSettings.requireRegister || siteSettings.disableRegister ? 'register' : 'login');
+    switchAuthTab(siteSettings.requireRegister && !siteSettings.disableRegister ? 'register' : 'login');
   }
 
   if (siteSettings.requireRegister) {
@@ -70,7 +70,9 @@ function updateAuthHint() {
   if (hint) {
     hint.textContent = siteSettings.requireRegister
       ? '本站已开启"注册用户才能生成短链"，请先注册并登录后再生成。'
-      : '登录后您的短链将归属到您的账户，可在管理后台查看统计。（当前未登录也可直接生成）';
+      : (siteSettings.disableRegister
+        ? '本站已暂停新用户注册，已有账户可正常登录。'
+        : '登录后您的短链将归属到您的账户，可在管理后台查看统计。（当前未登录也可直接生成）');
   }
 }
 
@@ -110,7 +112,9 @@ function switchAuthTab(mode, userInitiated = false) {
     ? '注册需要邮箱验证码验证，注册成功后自动登录。邮箱即您的账户名。'
     : (siteSettings.requireRegister
       ? '本站已开启"注册用户才能生成短链"，请先注册并登录后再生成。'
-      : '登录后您的短链将归属到您的账户，可在管理后台查看统计。（当前未登录也可直接生成）');
+      : (siteSettings.disableRegister
+        ? '本站已暂停新用户注册，已有账户可正常登录。'
+        : '登录后您的短链将归属到您的账户，可在管理后台查看统计。（当前未登录也可直接生成）'));
 }
 
 // 发送邮箱验证码（注册用），60 秒倒计时防重复
