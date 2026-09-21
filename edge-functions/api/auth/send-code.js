@@ -9,6 +9,9 @@ import { getKV, corsHeaders, checkRateLimit } from '../../lib/kv-helpers.js';
 //   4. ALIYUN_DM_ACCESS_KEY_ID  (阿里云邮件推送 DirectMail) + ALIYUN_DM_ACCESS_KEY_SECRET
 //      + MAIL_FROM（发信地址，需已在 DirectMail 控制台验证），可选 ALIYUN_DM_REGION（默认 cn-hangzhou）、
 //      ALIYUN_DM_FROM_ALIAS（发件人显示名）
+//      注意：公网端点按官方文档映射（https://help.aliyun.com/zh/direct-mail/api-dm-2015-11-23-endpoint），
+//      cn-hangzhou 为 dm.aliyuncs.com（无区域前缀），其余区域为 dm.<region>.aliyuncs.com。
+//      误用 dm.cn-hangzhou.aliyuncs.com（不存在的域名）会因无法解析被网关拦截，表现为 504。
 // 验证码有效期 10 分钟，60 秒内同邮箱只能发一次。
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -27,6 +30,11 @@ function aliyunPercentEncode(str) {
 // 避免邮件 HTML 模板导致 GET URL 超长被网关拒绝（504）。
 async function buildAliyunDirectMailRequest(provider, to, subject, text, html) {
   const region = provider.region || 'cn-hangzhou';
+  // 官方文档：杭州区域公网端点为 dm.aliyuncs.com（不带区域前缀），
+  // dm.cn-hangzhou.aliyuncs.com 域名不存在（DNS NXDOMAIN），请求会被网关拒绝并返回 504。
+  const endpoint = region === 'cn-hangzhou'
+    ? 'https://dm.aliyuncs.com/'
+    : `https://dm.${region}.aliyuncs.com/`;
   const params = {
     AccessKeyId: provider.keyId,
     Action: 'SingleSendMail',
@@ -65,7 +73,7 @@ async function buildAliyunDirectMailRequest(provider, to, subject, text, html) {
   const signature = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
 
   return {
-    url: `https://dm.${region}.aliyuncs.com/`,
+    url: endpoint,
     body: `${canonicalQuery}&Signature=${aliyunPercentEncode(signature)}`
   };
 }
