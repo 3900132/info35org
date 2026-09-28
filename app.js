@@ -526,7 +526,64 @@ function removeFromHistory(code) {
   localHistory = localHistory.filter(h => h.code !== code);
   localStorage.setItem('edgelink_history', JSON.stringify(localHistory));
   renderHistory();
-  showToast('记录已移除', 'info');
+}
+
+/* ---- 删除历史记录中的短链：弹窗确认后删除服务端短链并同步移除本地记录 ----
+ * 登录且短链归属当前账户时服务端一并删除；匿名短链（无归属）仅移除本地记录。 */
+function deleteHistoryItem(code) {
+  openDeleteConfirm(
+    `确定永久删除 /${code}？删除后该短链将立即失效，此操作不可恢复。`,
+    () => performHistoryDelete(code)
+  );
+}
+
+async function performHistoryDelete(code) {
+  if (authToken) {
+    try {
+      const resp = await fetch('/api/my/delete', {
+        method: 'DELETE',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ code })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok) {
+        removeFromHistory(code);
+        showToast('短链已永久删除', 'success');
+        return;
+      }
+      if (resp.status === 403) {
+        removeFromHistory(code);
+        showToast('该短链为匿名创建，已仅从本地记录移除', 'info');
+        return;
+      }
+      throw new Error(data.error || '删除失败');
+    } catch (err) {
+      showToast(err.message, 'error');
+      return;
+    }
+  }
+  removeFromHistory(code);
+  showToast('已从本地记录移除', 'info');
+}
+
+/* ---- 通用删除确认弹窗 ---- */
+let deleteConfirmCallback = null;
+
+function openDeleteConfirm(message, onConfirm) {
+  document.getElementById('deleteConfirmText').textContent = message;
+  deleteConfirmCallback = onConfirm;
+  document.getElementById('deleteConfirmModal').classList.remove('hidden');
+}
+
+function closeDeleteConfirm() {
+  document.getElementById('deleteConfirmModal').classList.add('hidden');
+  deleteConfirmCallback = null;
+}
+
+function confirmDeleteAction() {
+  const cb = deleteConfirmCallback;
+  closeDeleteConfirm();
+  if (cb) cb();
 }
 
 // ---- 本地历史记录分页 ----
@@ -648,7 +705,7 @@ function renderHistory() {
         <div class="row-actions">
           <button onclick="copyText('${item.shortUrl}')" class="btn btn-secondary btn-small">复制</button>
           <button onclick="showQRCode('${item.shortUrl}', '${item.code}')" class="btn btn-secondary btn-small">二维码</button>
-          <button onclick="removeFromHistory('${item.code}')" class="btn btn-danger btn-small" style="padding: 6px 8px;" title="从历史列表中移除">✕</button>
+          <button onclick="deleteHistoryItem('${item.code}')" class="btn btn-danger btn-small" title="永久删除该短链并移除本地记录">删除</button>
         </div>
       </td>
     `;

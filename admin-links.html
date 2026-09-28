@@ -42,7 +42,7 @@
           </div>
           <div class="header-actions">
             <a href="/admin" class="btn btn-secondary" style="text-decoration:none;">← 返回管理后台</a>
-            <input type="text" id="alSearchInput" oninput="alFilter()" placeholder="搜索短地址/内容..." class="search-input">
+            <input type="text" id="alSearchInput" oninput="alFilter()" placeholder="搜索短地址/内容/用户..." class="search-input">
             <button onclick="alExportCSV()" class="btn btn-secondary">📥 导出CSV</button>
             <button id="alBtnBulkDelete" onclick="alBulkDelete()" class="btn btn-danger hidden">🗑️ 批量删除 (<span id="alSelectedCount">0</span>)</button>
             <button onclick="alReload()" class="btn btn-secondary">🔄 刷新</button>
@@ -67,6 +67,7 @@
                 <th style="width: 40px; text-align: center;"><input type="checkbox" id="alSelectAll" onchange="alToggleSelectAll(this)" style="cursor: pointer;"></th>
                 <th>短地址</th>
                 <th>类型</th>
+                <th>用户</th>
                 <th>内容/原始链接</th>
                 <th>状态 (点击)</th>
                 <th>次数限制</th>
@@ -75,7 +76,7 @@
               </tr>
             </thead>
             <tbody id="alLinksList">
-              <tr class="empty-row"><td colspan="8">正在加载 KV 数据...</td></tr>
+              <tr class="empty-row"><td colspan="9">正在加载 KV 数据...</td></tr>
             </tbody>
           </table>
         </div>

@@ -122,6 +122,25 @@
     </div>
   </div>
 
+  <!-- Delete Confirm Modal (Hidden by default) -->
+  <div id="deleteConfirmModal" class="modal hidden">
+    <div class="modal-overlay" onclick="ucCloseDeleteConfirm()"></div>
+    <div class="modal-content glass">
+      <div class="modal-header">
+        <h3>⚠️ 确认删除</h3>
+        <button class="close-btn" onclick="ucCloseDeleteConfirm()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="deleteConfirmText" style="margin:0;font-size:0.95rem;line-height:1.6;color:var(--text-primary);"></p>
+        <small style="color:var(--text-secondary);">删除后该短链将从 KV 存储中永久移除，访问立即失效且不可恢复。</small>
+      </div>
+      <div class="modal-footer">
+        <button onclick="ucCloseDeleteConfirm()" class="btn btn-secondary">取消</button>
+        <button onclick="ucConfirmDeleteAction()" class="btn btn-danger">确认删除</button>
+      </div>
+    </div>
+  </div>
+
   <!-- QR Code Modal (Hidden by default) -->
   <div id="ucQrModal" class="modal hidden">
     <div class="modal-overlay" onclick="ucCloseQRModal()"></div>

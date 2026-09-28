@@ -1,4 +1,4 @@
-/* EdgeLink 用户中心：当前用户的短链列表，客户端分页（默认每页 30 条，可输入每页数量），支持复制/二维码/编辑短链内容 */
+/* EdgeLink 用户中心：当前用户的短链列表，客户端分页（默认每页 30 条，可输入每页数量），支持复制/二维码/编辑/删除 */
 
 let ucToken = localStorage.getItem('edgelink_token') || '';
 let ucUsername = '';
@@ -161,6 +161,7 @@ function ucRender() {
             <button onclick="ucCopyText('${shortUrl}')" class="btn btn-secondary btn-small">复制</button>
             <button onclick="ucShowQRCode('${shortUrl}', '${item.code}')" class="btn btn-secondary btn-small">二维码</button>
             <button onclick="ucOpenEditModal('${item.code}')" class="btn btn-secondary btn-small">编辑</button>
+            <button onclick="ucDeleteLink('${item.code}')" class="btn btn-danger btn-small" title="永久删除该短链">删除</button>
           </div>
         </td>
       `;
@@ -277,6 +278,61 @@ async function ucSaveEdit() {
   } finally {
     btn.disabled = false;
     btn.textContent = '保存修改';
+  }
+}
+
+/* ---- 行操作：删除短链（永久，弹窗确认） ---- */
+let ucDeleteConfirmCallback = null;
+
+function ucOpenDeleteConfirm(message, onConfirm) {
+  document.getElementById('deleteConfirmText').textContent = message;
+  ucDeleteConfirmCallback = onConfirm;
+  document.getElementById('deleteConfirmModal').classList.remove('hidden');
+}
+
+function ucCloseDeleteConfirm() {
+  document.getElementById('deleteConfirmModal').classList.add('hidden');
+  ucDeleteConfirmCallback = null;
+}
+
+function ucConfirmDeleteAction() {
+  const cb = ucDeleteConfirmCallback;
+  ucCloseDeleteConfirm();
+  if (cb) cb();
+}
+
+function ucDeleteLink(code) {
+  ucOpenDeleteConfirm(
+    `确定永久删除 /${code}？删除后该短链将立即失效，此操作不可恢复。`,
+    () => ucPerformDelete(code)
+  );
+}
+
+async function ucPerformDelete(code) {
+  try {
+    const resp = await fetch('/api/my/delete', {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${ucToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '删除失败');
+
+    // 同步清理本机首页的本地历史记录，避免残留已删除的短链
+    try {
+      const raw = localStorage.getItem('edgelink_history');
+      if (raw) {
+        const hist = JSON.parse(raw);
+        if (Array.isArray(hist) && hist.some(h => h && h.code === code)) {
+          localStorage.setItem('edgelink_history', JSON.stringify(hist.filter(h => h && h.code !== code)));
+        }
+      }
+    } catch (e) { /* 本地清理失败不影响删除结果 */ }
+
+    ucShowToast(`/${code} 已删除`, 'success');
+    await ucReload(true);
+  } catch (err) {
+    ucShowToast(err.message, 'error');
   }
 }
 
