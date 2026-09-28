@@ -253,14 +253,14 @@ function alRender() {
 
     for (const item of shown) {
       const shortUrl = `${origin}/${item.code}`;
-      let dateStr = 'Unknown';
+      let dateStr = '未知';
       if (item.createdAt) {
         const d = new Date(item.createdAt);
         dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       }
       const typeLabel = item.type === 'text'
-        ? '<span style="background: rgba(190,100,50,0.08);color:var(--accent-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(190,100,50,0.2);font-weight:600;">Text</span>'
-        : '<span style="background: rgba(145,80,46,0.08);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(145,80,46,0.2);font-weight:600;">Link</span>';
+        ? '<span style="background: rgba(190,100,50,0.08);color:var(--accent-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(190,100,50,0.2);font-weight:600;">📝 文字</span>'
+        : '<span style="background: rgba(145,80,46,0.08);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(145,80,46,0.2);font-weight:600;">🔗 链接</span>';
       const ownerLabel = item.owner
         ? `<span style="font-size:0.85rem;color:var(--text-secondary);" title="生成该短链的用户">${alEscapeHtml(item.owner)}</span>`
         : '<span style="font-size:0.85rem;color:var(--text-muted);">匿名</span>';
@@ -271,11 +271,11 @@ function alRender() {
       const viewLimit = item.viewLimit;
       const isDestroyed = viewLimit && (clicks >= viewLimit);
       const statusLabel = isDestroyed
-        ? '<span style="background:rgba(255,69,58,0.1);color:var(--danger-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(255,69,58,0.2);font-weight:600;">Destroyed</span>'
+        ? '<span style="background:rgba(255,69,58,0.1);color:var(--danger-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(255,69,58,0.2);font-weight:600;">已销毁</span>'
         : clicks > 0
-          ? '<span style="background:rgba(50,215,75,0.1);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(50,215,75,0.2);font-weight:600;">Viewed</span>'
-          : '<span style="background:rgba(255,255,255,0.05);color:var(--text-muted);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid var(--border-color);font-weight:600;">Unviewed</span>';
-      const limitLabel = `<span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);font-weight:600;">${clicks} / ${viewLimit || 'Unlimited'}</span>`;
+          ? '<span style="background:rgba(50,215,75,0.1);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(50,215,75,0.2);font-weight:600;">已查看</span>'
+          : '<span style="background:rgba(255,255,255,0.05);color:var(--text-muted);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid var(--border-color);font-weight:600;">未查看</span>';
+      const limitLabel = `<span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text-secondary);font-weight:600;">${clicks} / ${viewLimit || '无限制'}</span>`;
 
       const row = document.createElement('tr');
       row.innerHTML = `
