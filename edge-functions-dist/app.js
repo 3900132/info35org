@@ -6,6 +6,8 @@
 
 // State management
 let localHistory = [];
+let historyPage = 1;
+let historyPageSize = 10;
 
 // Auth state
 let authToken = localStorage.getItem('edgelink_token') || '';
@@ -43,7 +45,6 @@ async function initAuth() {
         const data = await resp.json();
         authUsername = data.username || authUsername;
         setLoggedInView(true);
-        loadMyLinks();
         return;
       }
     } catch (e) { /* fallthrough */ }
@@ -88,9 +89,6 @@ function setLoggedInView(loggedIn) {
   document.getElementById('authLoggedOut').classList.toggle('hidden', loggedIn);
   if (loggedIn) {
     document.getElementById('authDisplayName').textContent = authUsername;
-    document.getElementById('myLinksCard').classList.remove('hidden');
-  } else {
-    document.getElementById('myLinksCard').classList.add('hidden');
   }
 }
 
@@ -214,57 +212,10 @@ async function handleLogout() {
   showToast('已退出登录', 'info');
 }
 
-function toggleMyLinks() {
-  const card = document.getElementById('myLinksCard');
-  card.classList.toggle('hidden');
-  if (!card.classList.contains('hidden')) loadMyLinks();
-}
-
-// Load links owned by the current user with live click stats
-async function loadMyLinks() {
-  if (!authToken) return;
-  const listBody = document.getElementById('myLinksList');
-  listBody.innerHTML = '<tr class="empty-row"><td colspan="5">加载中...</td></tr>';
-
-  try {
-    const resp = await fetch('/api/my/links', { headers: authHeaders() });
-    if (resp.status === 401) { clearAuthSession(); setLoggedInView(false); return; }
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || '加载失败');
-
-    const links = data.links || [];
-    if (links.length === 0) {
-      listBody.innerHTML = '<tr class="empty-row"><td colspan="5">暂无数据，生成短链后这里会自动出现。</td></tr>';
-      return;
-    }
-
-    listBody.innerHTML = '';
-    for (const item of links) {
-      const shortUrl = `${window.location.origin}/${item.code}`;
-      const typeLabel = item.type === 'text' ? '📝 文字' : '🔗 链接';
-      const content = item.type === 'text'
-        ? `<span style="color: var(--text-secondary); font-style: italic;">${escapeHtml((item.text || '').substring(0, 60))}</span>`
-        : `<a href="${escapeHtml(item.url)}" target="_blank" class="link-url">${escapeHtml(item.url)}</a>`;
-      const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN') : '未知';
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td><a href="${shortUrl}" target="_blank" class="link-code">/${escapeHtml(item.code)}</a></td>
-        <td>${typeLabel}</td>
-        <td title="${escapeHtml(item.url || item.text || '')}">${content}</td>
-        <td><span class="clicks-badge" style="padding:1px 8px;font-size:0.8rem;">${item.clicks || 0} 次点击</span></td>
-        <td><span class="date-text">${dateStr}</span></td>
-      `;
-      listBody.appendChild(row);
-    }
-  } catch (err) {
-    listBody.innerHTML = `<tr class="empty-row"><td colspan="5">加载失败：${escapeHtml(err.message)}</td></tr>`;
-  }
-}
-
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   initHistory();
+  document.getElementById('historyPageSize').addEventListener('change', applyHistoryPageSize);
   initAuth();
   checkUrlParams();
 });
@@ -561,12 +512,13 @@ function initHistory() {
 function addToHistory(item) {
   localHistory = localHistory.filter(h => h.code !== item.code);
   localHistory.unshift(item); // Add to top
-  
+
   if (localHistory.length > 30) {
     localHistory.pop();
   }
-  
+
   localStorage.setItem('edgelink_history', JSON.stringify(localHistory));
+  historyPage = 1; // 新记录置顶，回到第一页
   renderHistory();
 }
 
@@ -577,21 +529,64 @@ function removeFromHistory(code) {
   showToast('记录已移除', 'info');
 }
 
+// ---- 本地历史记录分页 ----
+function readHistoryPageSize() {
+  const input = document.getElementById('historyPageSize');
+  let size = parseInt(input.value, 10);
+  if (!Number.isFinite(size) || size < 1) size = 10;
+  if (size > 100) size = 100;
+  input.value = size;
+  return size;
+}
+
+function applyHistoryPageSize() {
+  const size = readHistoryPageSize();
+  if (size !== historyPageSize) {
+    historyPageSize = size;
+    historyPage = 1;
+  }
+  renderHistory();
+}
+
+function changeHistoryPage(delta) {
+  const totalPages = Math.max(1, Math.ceil(localHistory.length / historyPageSize));
+  const next = historyPage + delta;
+  if (next < 1 || next > totalPages) return;
+  historyPage = next;
+  renderHistory();
+}
+
+function updateHistoryPager() {
+  const total = localHistory.length;
+  const totalPages = Math.max(1, Math.ceil(total / historyPageSize));
+  if (historyPage > totalPages) historyPage = totalPages;
+  if (historyPage < 1) historyPage = 1;
+
+  document.getElementById('historyCountInfo').textContent = `共 ${total} 条记录`;
+  document.getElementById('historyPageInfo').textContent = `第 ${historyPage} / ${totalPages} 页`;
+  document.getElementById('historyBtnPrev').disabled = historyPage <= 1;
+  document.getElementById('historyBtnNext').disabled = historyPage >= totalPages;
+}
+
 function renderHistory() {
   const historyList = document.getElementById('historyList');
-  
+
   if (localHistory.length === 0) {
     historyList.innerHTML = `
       <tr class="empty-row">
         <td colspan="7">暂无生成记录，立即在上方创建一个吧！</td>
       </tr>
     `;
+    updateHistoryPager();
     return;
   }
-  
+
   historyList.innerHTML = '';
-  
-  localHistory.forEach(item => {
+
+  const start = (historyPage - 1) * historyPageSize;
+  const pageItems = localHistory.slice(start, start + historyPageSize);
+
+  pageItems.forEach(item => {
     const row = document.createElement('tr');
     
     // Format date
@@ -659,6 +654,8 @@ function renderHistory() {
     `;
     historyList.appendChild(row);
   });
+
+  updateHistoryPager();
 }
 
 // Background poll to fetch real-time click statistics for user's history links

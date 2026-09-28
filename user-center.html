@@ -77,9 +77,11 @@
                 <tr>
                   <th>短地址</th>
                   <th>类型</th>
-                  <th>原始链接/内容</th>
-                  <th>点击统计</th>
+                  <th>原始地址/内容</th>
+                  <th>状态 (点击)</th>
+                  <th>次数限制</th>
                   <th>创建时间</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody id="ucLinksList"></tbody>
@@ -94,9 +96,57 @@
     </footer>
   </div>
 
+  <!-- Edit Link Modal (Hidden by default) -->
+  <div id="editModal" class="modal hidden">
+    <div class="modal-overlay" onclick="ucCloseEditModal()"></div>
+    <div class="modal-content glass">
+      <div class="modal-header">
+        <h3>编辑短链内容</h3>
+        <button class="close-btn" onclick="ucCloseEditModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="align-items:stretch;text-align:left;">
+        <p id="editShortCodeText" style="margin:0;font-size:0.9rem;color:var(--text-secondary);"></p>
+        <div class="form-group" style="margin:0;">
+          <label for="editContentInput">新的原始链接 / 文字内容 <span class="required">*</span></label>
+          <div class="input-wrapper">
+            <span class="input-icon" style="top: 14px; align-self: flex-start;">🌐</span>
+            <textarea id="editContentInput" required style="height: 100px; resize: vertical; padding-top: 14px;"></textarea>
+          </div>
+          <small class="helper-text">以 http(s):// 开头将保存为链接跳转，否则保存为文字分享。点击统计与有效期保持不变。</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="ucCloseEditModal()" class="btn btn-secondary">取消</button>
+        <button id="btnSaveEdit" onclick="ucSaveEdit()" class="btn btn-primary">保存修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR Code Modal (Hidden by default) -->
+  <div id="ucQrModal" class="modal hidden">
+    <div class="modal-overlay" onclick="ucCloseQRModal()"></div>
+    <div class="modal-content glass">
+      <div class="modal-header">
+        <h3>短链接二维码</h3>
+        <button class="close-btn" onclick="ucCloseQRModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="ucQrcodeContainer"></div>
+        <p id="ucQrUrlText"></p>
+        <small>扫描上方二维码即可直接在手机端打开短链接。</small>
+      </div>
+      <div class="modal-footer">
+        <button id="ucBtnDownloadQR" class="btn btn-secondary">下载二维码</button>
+        <button onclick="ucCloseQRModal()" class="btn btn-primary">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notifications Container -->
   <div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:9999;"></div>
 
+  <!-- Local QR Code Library -->
+  <script src="qrcode.min.js" defer></script>
   <script src="user-center.js" defer></script>
 </body>
 </html>

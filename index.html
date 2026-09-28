@@ -176,33 +176,6 @@
           </div>
         </div>
 
-        <!-- My Links Panel (visible when logged in) -->
-        <div id="myLinksCard" class="card glass hidden">
-          <div class="card-header flex-header">
-            <div>
-              <h3>我的短链与点击统计</h3>
-              <p>当前账户生成的所有短链，数据实时来自边缘节点。</p>
-            </div>
-            <button onclick="loadMyLinks()" class="btn btn-secondary">🔄 刷新</button>
-          </div>
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>短地址</th>
-                  <th>类型</th>
-                  <th>原始链接/内容</th>
-                  <th>点击统计</th>
-                  <th>创建时间</th>
-                </tr>
-              </thead>
-              <tbody id="myLinksList">
-                <tr class="empty-row"><td colspan="5">暂无数据，生成短链后这里会自动出现。</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
       <!-- Section 1: Link Shortener Dashboard -->
       <section id="panelShortener" class="content-panel active">
         <div class="card glass">
@@ -333,6 +306,19 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="pagination-bar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:14px;">
+            <span id="historyCountInfo" style="font-size:0.9rem;color:var(--text-secondary);">共 0 条记录</span>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+              <label style="font-size:0.9rem;color:var(--text-secondary);">每页显示
+                <input type="number" id="historyPageSize" min="1" max="100" value="10" style="width:70px;margin:0 6px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);">
+                条
+              </label>
+              <button onclick="changeHistoryPage(-1)" id="historyBtnPrev" class="btn btn-secondary" style="width:auto;padding:6px 14px;">← 上一页</button>
+              <span id="historyPageInfo" style="font-size:0.9rem;color:var(--text-secondary);">第 1 / 1 页</span>
+              <button onclick="changeHistoryPage(1)" id="historyBtnNext" class="btn btn-secondary" style="width:auto;padding:6px 14px;">下一页 →</button>
+            </div>
           </div>
         </div>
       </section>

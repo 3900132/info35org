@@ -257,6 +257,7 @@ const edgeRoutes = [
   { method: 'post',   path: '/api/auth/logout',           file: './edge-functions/api/auth/logout.js' },
   { method: 'get',    path: '/api/auth/me',               file: './edge-functions/api/auth/me.js' },
   { method: 'get',    path: '/api/my/links',              file: './edge-functions/api/my/links.js' },
+  { method: 'post',   path: '/api/my/update',             file: './edge-functions/api/my/update.js' },
   { method: 'get',    path: '/api/admin/users',           file: './edge-functions/api/admin/users.js' },
   { method: 'post',   path: '/api/admin/user-status',     file: './edge-functions/api/admin/user-status.js' },
   { method: 'get',    path: '/api/admin/user-links',      file: './edge-functions/api/admin/user-links.js' },
