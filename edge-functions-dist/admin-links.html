@@ -42,7 +42,7 @@
           </div>
           <div class="header-actions">
             <a href="/admin" class="btn btn-secondary" style="text-decoration:none;">← 返回管理后台</a>
-            <input type="text" id="alSearchInput" oninput="alFilter()" placeholder="搜索短地址/内容..." class="search-input">
+            <input type="text" id="alSearchInput" oninput="alFilter()" placeholder="搜索短地址/内容/用户..." class="search-input">
             <button onclick="alExportCSV()" class="btn btn-secondary">📥 导出CSV</button>
             <button id="alBtnBulkDelete" onclick="alBulkDelete()" class="btn btn-danger hidden">🗑️ 批量删除 (<span id="alSelectedCount">0</span>)</button>
             <button onclick="alReload()" class="btn btn-secondary">🔄 刷新</button>
@@ -67,6 +67,7 @@
                 <th style="width: 40px; text-align: center;"><input type="checkbox" id="alSelectAll" onchange="alToggleSelectAll(this)" style="cursor: pointer;"></th>
                 <th>短地址</th>
                 <th>类型</th>
+                <th>用户</th>
                 <th>内容/原始链接</th>
                 <th>状态 (点击)</th>
                 <th>次数限制</th>
@@ -75,7 +76,7 @@
               </tr>
             </thead>
             <tbody id="alLinksList">
-              <tr class="empty-row"><td colspan="8">正在加载 KV 数据...</td></tr>
+              <tr class="empty-row"><td colspan="9">正在加载 KV 数据...</td></tr>
             </tbody>
           </table>
         </div>
@@ -85,6 +86,32 @@
     <footer class="footer">
       <p>© 2026 EdgeLink Admin | <a href="/admin" style="color:var(--accent-color);">返回管理后台</a></p>
     </footer>
+  </div>
+
+  <!-- Edit Link Modal (Hidden by default) -->
+  <div id="editModal" class="modal hidden">
+    <div class="modal-overlay" onclick="alCloseEditModal()"></div>
+    <div class="modal-content glass">
+      <div class="modal-header">
+        <h3>编辑短链内容</h3>
+        <button class="close-btn" onclick="alCloseEditModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="align-items:stretch;text-align:left;">
+        <p id="alEditShortCodeText" style="margin:0;font-size:0.9rem;color:var(--text-secondary);"></p>
+        <div class="form-group" style="margin:0;">
+          <label for="alEditContentInput">新的原始链接 / 文字内容 <span class="required">*</span></label>
+          <div class="input-wrapper">
+            <span class="input-icon" style="top: 14px; align-self: flex-start;">🌐</span>
+            <textarea id="alEditContentInput" required style="height: 100px; resize: vertical; padding-top: 14px;"></textarea>
+          </div>
+          <small class="helper-text">以 http(s):// 开头将保存为链接跳转，否则保存为文字分享。点击统计、归属用户与有效期保持不变。</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="alCloseEditModal()" class="btn btn-secondary">取消</button>
+        <button id="alBtnSaveEdit" onclick="alSaveEdit()" class="btn btn-primary">保存修改</button>
+      </div>
+    </div>
   </div>
 
   <!-- QR Code Modal -->

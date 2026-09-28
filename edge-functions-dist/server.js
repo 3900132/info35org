@@ -145,6 +145,18 @@ app.delete('/api/admin/delete', async (req, res) => {
   }
 });
 
+app.post('/api/admin/update', async (req, res) => {
+  try {
+    const { default: handler } = await import('./edge-functions/api/admin/update.js');
+    const context = buildWebContext(req, res);
+    const webRes = await handler(context);
+    await sendResponse(webRes, res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: `Local Emulation Error: ${err.message}` });
+  }
+});
+
 // Serve frontend assets
 app.get('/style.css', (req, res) => {
   res.sendFile(path.join(__dirname, 'style.css'));

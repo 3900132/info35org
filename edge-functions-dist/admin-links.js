@@ -1,6 +1,6 @@
 /* EdgeLink 管理后台 - 所有短链接页（/admin-links）
  * 从仪表盘拆出的独立页面：加载全部短链后客户端分页（默认每页 30 条，可输入每页数量），
- * 支持搜索过滤、批量删除、单条删除、复制、二维码、文字预览与 CSV 导出。 */
+ * 支持搜索过滤（含归属用户）、用户列展示、批量删除、单条删除、编辑短链内容、复制、二维码、文字预览与 CSV 导出。 */
 
 let alToken = sessionStorage.getItem('edgelink_admin_token') || '';
 let alLinks = [];
@@ -111,7 +111,8 @@ function alFiltered() {
   return alLinks.filter(item =>
     item.code.toLowerCase().includes(q) ||
     (item.url && item.url.toLowerCase().includes(q)) ||
-    (item.text && item.text.toLowerCase().includes(q))
+    (item.text && item.text.toLowerCase().includes(q)) ||
+    (item.owner && item.owner.toLowerCase().includes(q))
   );
 }
 
@@ -171,6 +172,64 @@ async function alDeleteLink(code) {
   }
 }
 
+/* ---------- 编辑短链内容（管理员可编辑任意短链） ---------- */
+
+let alEditingCode = '';
+
+function alOpenEditModal(code) {
+  const item = alLinks.find(link => link.code === code);
+  if (!item) return;
+  alEditingCode = code;
+  const current = (item.url || item.text || '').substring(0, 80);
+  document.getElementById('alEditShortCodeText').innerHTML =
+    `短地址 <span class="link-code">/${alEscapeHtml(code)}</span>，当前内容：<span style="color:var(--text-secondary);">${alEscapeHtml(current)}</span>`;
+  document.getElementById('alEditContentInput').value = item.url || item.text || '';
+  document.getElementById('editModal').classList.remove('hidden');
+  document.getElementById('alEditContentInput').focus();
+}
+
+function alCloseEditModal() {
+  document.getElementById('editModal').classList.add('hidden');
+  alEditingCode = '';
+}
+
+async function alSaveEdit() {
+  if (!alEditingCode) return;
+  const content = document.getElementById('alEditContentInput').value.trim();
+  if (!content) {
+    alShowToast('请输入新的原始链接或文字内容', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('alBtnSaveEdit');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  try {
+    const resp = await fetch('/api/admin/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${alToken}` },
+      body: JSON.stringify({ code: alEditingCode, url: content })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || '保存失败');
+
+    // 就地更新列表数据，避免整页重新拉取 KV
+    const idx = alLinks.findIndex(l => l.code === alEditingCode);
+    if (idx >= 0 && data.link) {
+      alLinks[idx] = { ...alLinks[idx], ...data.link };
+    }
+    alCloseEditModal();
+    alShowToast('短链内容已更新', 'success');
+    alRender();
+  } catch (err) {
+    alShowToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存修改';
+  }
+}
+
 function alRender() {
   const size = alReadPageSize();
   if (size !== alPageSize) { alPageSize = size; alPage = 1; }
@@ -185,7 +244,7 @@ function alRender() {
   alUpdateSelectedCount();
 
   if (filtered.length === 0) {
-    listBody.innerHTML = `<tr class="empty-row"><td colspan="8">${alFilterQuery ? '没有匹配的短链' : 'KV 中暂无短链'}</td></tr>`;
+    listBody.innerHTML = `<tr class="empty-row"><td colspan="9">${alFilterQuery ? '没有匹配的短链' : 'KV 中暂无短链'}</td></tr>`;
   } else {
     const start = (alPage - 1) * alPageSize;
     const shown = filtered.slice(start, start + alPageSize);
@@ -202,6 +261,9 @@ function alRender() {
       const typeLabel = item.type === 'text'
         ? '<span style="background: rgba(190,100,50,0.08);color:var(--accent-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(190,100,50,0.2);font-weight:600;">Text</span>'
         : '<span style="background: rgba(145,80,46,0.08);color:var(--success-color);padding:2px 8px;border-radius:4px;font-size:0.8rem;border:1px solid rgba(145,80,46,0.2);font-weight:600;">Link</span>';
+      const ownerLabel = item.owner
+        ? `<span style="font-size:0.85rem;color:var(--text-secondary);" title="生成该短链的用户">${alEscapeHtml(item.owner)}</span>`
+        : '<span style="font-size:0.85rem;color:var(--text-muted);">匿名</span>';
       const displayContent = item.type === 'text'
         ? `<span style="color:var(--text-secondary);font-style:italic;font-family:var(--font-mono);font-size:0.85rem;cursor:pointer;" onclick="alPreviewText('${alEscapeHtml(item.code)}')" title="点击预览">${alEscapeHtml((item.text || '').length > 40 ? item.text.substring(0, 40) + '...' : item.text)}</span>`
         : `<a href="${alEscapeHtml(item.url)}" target="_blank" rel="noopener" class="link-url">${alEscapeHtml(item.url)}</a>`;
@@ -220,6 +282,7 @@ function alRender() {
         <td style="text-align:center;"><input type="checkbox" class="al-link-checkbox" value="${alEscapeHtml(item.code)}" onchange="alUpdateSelectedCount()" style="cursor:pointer;"></td>
         <td><a href="${alEscapeHtml(shortUrl)}" target="_blank" rel="noopener" class="link-code">/${alEscapeHtml(item.code)}</a></td>
         <td>${typeLabel}</td>
+        <td>${ownerLabel}</td>
         <td title="${alEscapeHtml(item.url || item.text || '')}">${displayContent}</td>
         <td>${statusLabel} <span class="clicks-badge" style="padding:1px 6px;font-size:0.75rem;">${clicks}x</span></td>
         <td>${limitLabel}</td>
@@ -229,6 +292,7 @@ function alRender() {
             ${item.type === 'text' ? `<button onclick="alPreviewText('${alEscapeHtml(item.code)}')" class="btn btn-secondary btn-small">查看</button>` : ''}
             <button onclick="alCopyText('${alEscapeHtml(shortUrl)}')" class="btn btn-secondary btn-small">复制</button>
             <button onclick="alShowQR('${alEscapeHtml(shortUrl)}','${alEscapeHtml(item.code)}')" class="btn btn-secondary btn-small">二维码</button>
+            <button onclick="alOpenEditModal('${alEscapeHtml(item.code)}')" class="btn btn-secondary btn-small">编辑</button>
             <button onclick="alDeleteLink('${alEscapeHtml(item.code)}')" class="btn btn-danger btn-small">删除</button>
           </div>
         </td>`;
@@ -315,9 +379,10 @@ function alExportCSV() {
     return;
   }
   const BOM = '\uFEFF';
-  const headers = ['短地址', '类型', '原始链接', '点击数', '查看限制', '过期时间', '创建时间'];
+  const headers = ['短地址', '类型', '用户', '原始链接', '点击数', '查看限制', '过期时间', '创建时间'];
   const rows = source.map(item => {
     const type = item.type === 'text' ? '文字' : '链接';
+    const owner = item.owner || '匿名';
     const content = item.type === 'text' ? (item.text || '') : (item.url || '');
     const limit = item.viewLimit || '无限制';
     const expires = item.expiresAt || '永不过期';
@@ -325,7 +390,7 @@ function alExportCSV() {
     if (item.createdAt) {
       created = new Date(item.createdAt).toLocaleString('zh-CN');
     }
-    return [item.code, type, content, item.clicks || 0, limit, expires, created];
+    return [item.code, type, owner, content, item.clicks || 0, limit, expires, created];
   });
   const csvContent = BOM + [headers, ...rows]
     .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))

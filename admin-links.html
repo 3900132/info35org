@@ -88,6 +88,32 @@
     </footer>
   </div>
 
+  <!-- Edit Link Modal (Hidden by default) -->
+  <div id="editModal" class="modal hidden">
+    <div class="modal-overlay" onclick="alCloseEditModal()"></div>
+    <div class="modal-content glass">
+      <div class="modal-header">
+        <h3>编辑短链内容</h3>
+        <button class="close-btn" onclick="alCloseEditModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="align-items:stretch;text-align:left;">
+        <p id="alEditShortCodeText" style="margin:0;font-size:0.9rem;color:var(--text-secondary);"></p>
+        <div class="form-group" style="margin:0;">
+          <label for="alEditContentInput">新的原始链接 / 文字内容 <span class="required">*</span></label>
+          <div class="input-wrapper">
+            <span class="input-icon" style="top: 14px; align-self: flex-start;">🌐</span>
+            <textarea id="alEditContentInput" required style="height: 100px; resize: vertical; padding-top: 14px;"></textarea>
+          </div>
+          <small class="helper-text">以 http(s):// 开头将保存为链接跳转，否则保存为文字分享。点击统计、归属用户与有效期保持不变。</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="alCloseEditModal()" class="btn btn-secondary">取消</button>
+        <button id="alBtnSaveEdit" onclick="alSaveEdit()" class="btn btn-primary">保存修改</button>
+      </div>
+    </div>
+  </div>
+
   <!-- QR Code Modal -->
   <div id="qrModal" class="modal hidden">
     <div class="modal-overlay" onclick="alCloseQRModal()"></div>
