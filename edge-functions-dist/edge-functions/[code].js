@@ -607,7 +607,7 @@ function redirectHtmlPage(url, delaySeconds = 0, code = '') {
         </div>
       </div>
       <div style="margin-top: 18px;">
-        <a href="javascript:void(0)" id="btnReportToggle" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none;">🚩 举报此链接</a>
+        <a id="btnReportToggle" role="button" tabindex="0" style="font-size: 0.8rem; color: var(--text-muted); text-decoration: none; cursor: pointer;">🚩 举报此链接</a>
       </div>
       <div id="reportBox" style="display: none; text-align: left; margin-top: 12px; background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px;">
         <select id="reportReason" style="width: 100%; padding: 8px 10px; margin-bottom: 10px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); font-size: 0.85rem;">
@@ -670,6 +670,8 @@ function redirectHtmlPage(url, delaySeconds = 0, code = '') {
             clearInterval(timer);
             showError();
           });
+        // 兜底闹钟：即使倒计时被页面交互（如点击举报）或异常中断，也保证按时跳转
+        setTimeout(doRedirect, delaySeconds * 1000 + 800);
       })();
 
       // 举报此链接
