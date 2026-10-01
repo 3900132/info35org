@@ -196,7 +196,7 @@ function redirectHtmlPage(url, delaySeconds = 0, code = '') {
       <div id="loadingState">
         <div class="spinner"></div>
         <h2 style="font-weight: 700; margin-bottom: 8px;">正在跳转...</h2>
-        <p style="font-size: 0.9rem; color: var(--text-secondary);">将在 <span id="countdown" style="color: var(--accent-color); font-weight: 700;">${delay}</span> 秒后自动跳转到目标地址</p>
+        <p id="countdownText" style="font-size: 0.9rem; color: var(--text-secondary);">将在 <span id="countdown" style="color: var(--accent-color); font-weight: 700;">${delay}</span> 秒后自动跳转到目标地址</p>
         <div class="url-text">${escapeHtml(url)}</div>
         <button type="button" id="btnJumpNow" class="btn btn-secondary" style="width: auto; padding: 8px 24px; margin: 0 auto;">立即跳转</button>
       </div>
@@ -232,10 +232,18 @@ function redirectHtmlPage(url, delaySeconds = 0, code = '') {
         const targetUrl = ${JSON.stringify(url)};
         const delaySeconds = ${JSON.stringify(delay)};
         let resolved = false;
-        function doRedirect() {
+        let autoJumpCancelled = false;
+        let timer = null;
+
+        function navigateNow() {
           if (resolved) return;
           resolved = true;
           window.location.replace(targetUrl);
+        }
+        // 自动跳转入口：用户点击举报后不再自动跳转
+        function autoRedirect() {
+          if (autoJumpCancelled) return;
+          navigateNow();
         }
         function showError() {
           if (resolved) return;
@@ -243,26 +251,40 @@ function redirectHtmlPage(url, delaySeconds = 0, code = '') {
           document.getElementById('loadingState').classList.add('hidden');
           document.getElementById('errorState').classList.remove('hidden');
         }
+        // 点击"举报此链接"后调用：取消自动跳转，仅保留手动"立即跳转"
+        function cancelAutoJump() {
+          if (autoJumpCancelled) return;
+          autoJumpCancelled = true;
+          if (timer) clearInterval(timer);
+          const tip = document.getElementById('countdownText');
+          if (tip) tip.innerHTML = '已暂停自动跳转。如需继续访问目标地址，请点击下方“立即跳转”按钮。';
+        }
+
         if (delaySeconds <= 0) {
-          doRedirect();
+          navigateNow();
           return;
         }
+
         // 倒计时结束后跳转（后台可配置停留秒数）
         let remaining = delaySeconds;
         const countdownEl = document.getElementById('countdown');
-        const timer = setInterval(() => {
+        timer = setInterval(() => {
           remaining--;
           if (remaining <= 0) {
             clearInterval(timer);
-            doRedirect();
+            autoRedirect();
             return;
           }
           countdownEl.textContent = remaining;
         }, 1000);
+        // 兜底闹钟：即使倒计时被异常中断也按时自动跳转（用户点击举报后失效）
+        setTimeout(autoRedirect, delaySeconds * 1000 + 800);
+
         document.getElementById('btnJumpNow').addEventListener('click', () => {
           clearInterval(timer);
-          doRedirect();
+          navigateNow();
         });
+
         // 可达性探测：确认失败（非超时）则停止倒计时并进入错误态
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2500);
@@ -274,46 +296,44 @@ function redirectHtmlPage(url, delaySeconds = 0, code = '') {
             clearInterval(timer);
             showError();
           });
-        // 兜底闹钟：即使倒计时被页面交互（如点击举报）或异常中断，也保证按时跳转
-        setTimeout(doRedirect, delaySeconds * 1000 + 800);
-      })();
 
-      // 举报此链接
-      (function() {
+        // 举报此链接：打开/收起举报框；只要点过一次就取消自动跳转
         const toggle = document.getElementById('btnReportToggle');
         const box = document.getElementById('reportBox');
-        if (!toggle || !box) return;
-        toggle.addEventListener('click', () => {
-          box.style.display = box.style.display === 'none' ? 'block' : 'none';
-        });
-        document.getElementById('btnReportSubmit').addEventListener('click', async function() {
-          const btn = this;
-          const reason = document.getElementById('reportReason').value;
-          const note = document.getElementById('reportNote').value.trim();
-          if (!reason && !note) {
-            showToast('请选择举报原因或填写补充说明');
-            return;
-          }
-          btn.disabled = true;
-          btn.textContent = '提交中...';
-          try {
-            const fullReason = [reason, note].filter(Boolean).join(' - ');
-            const resp = await fetch('/api/report', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: ${JSON.stringify(code)}, reason: fullReason })
-            });
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || '提交失败');
-            box.style.display = 'none';
-            toggle.style.display = 'none';
-            document.getElementById('reportDone').style.display = 'block';
-          } catch (err) {
-            showToast(err.message);
-            btn.disabled = false;
-            btn.textContent = '提交举报';
-          }
-        });
+        if (toggle && box) {
+          toggle.addEventListener('click', () => {
+            box.style.display = box.style.display === 'none' ? 'block' : 'none';
+            cancelAutoJump();
+          });
+          document.getElementById('btnReportSubmit').addEventListener('click', async function() {
+            const btn = this;
+            const reason = document.getElementById('reportReason').value;
+            const note = document.getElementById('reportNote').value.trim();
+            if (!reason && !note) {
+              showToast('请选择举报原因或填写补充说明');
+              return;
+            }
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+            try {
+              const fullReason = [reason, note].filter(Boolean).join(' - ');
+              const resp = await fetch('/api/report', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: ${JSON.stringify(code)}, reason: fullReason })
+              });
+              const data = await resp.json();
+              if (!resp.ok) throw new Error(data.error || '提交失败');
+              box.style.display = 'none';
+              toggle.style.display = 'none';
+              document.getElementById('reportDone').style.display = 'block';
+            } catch (err) {
+              showToast(err.message);
+              btn.disabled = false;
+              btn.textContent = '提交举报';
+            }
+          });
+        }
       })();
     </script>`,
     `
